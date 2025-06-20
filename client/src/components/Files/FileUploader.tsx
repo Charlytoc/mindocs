@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FileInput } from "./FileInput";
 import { Modal } from "../Modal/Modal";
 import { sendFilesInitialDemand } from "../../utils/api";
 import toast from "react-hot-toast";
 
 type FileUploaderProps = {
-  onUploadSuccess?: ({ process_id }: { process_id: string }) => void;
+  onUploadSuccess?: ({ case_id }: { case_id: string }) => void;
 };
 
 export type HashedFile = {
@@ -17,6 +17,7 @@ export type HashedFile = {
 export const FileUploader: React.FC<FileUploaderProps> = ({
   onUploadSuccess,
 }) => {
+  const resumenDelCasoRef = useRef<HTMLTextAreaElement>(null);
   // const clientId = useStore((state) => state.clientId);
   const [isOpen, setIsOpen] = useState(false);
   const [files, setFiles] = useState<FileList | null>(null);
@@ -37,6 +38,9 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
     }
 
     try {
+      if (resumenDelCasoRef.current) {
+        formData.append("resumen_del_caso", resumenDelCasoRef.current.value);
+      }
       const response = await sendFilesInitialDemand(formData);
       setIsOpen(false);
       setIsLoading(false);
@@ -44,10 +48,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         "Archivos enviados, nuestro agente IA está trabajando en ello",
         { id: tid }
       );
-      console.log(response.process_id, "process_id");
+      console.log(response.case_id, "process_id");
       if (onUploadSuccess)
         onUploadSuccess({
-          process_id: response.process_id,
+          case_id: response.case_id,
         });
     } catch (error) {
       console.error("Error al enviar datos:", error);
@@ -83,6 +87,13 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
             name="files"
             onChange={setFiles}
           />
+
+          <textarea
+            ref={resumenDelCasoRef}
+            name="resumen_del_caso"
+            placeholder="Resumen del caso: Explicar brevemente el caso, los hechos, los demandados, los demandantes, etc."
+            className="w-full h-40 p-2 border border-gray-300 rounded-md"
+          ></textarea>
 
           <button
             onClick={handleSubmit}

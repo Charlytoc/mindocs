@@ -42,3 +42,9 @@ class RedisCache:
 
     def hgetall(self, name: str) -> dict:
         return self.client.hgetall(name)
+
+    def publish(self, channel: str, message: str) -> None:
+        self.client.publish(channel, message)
+
+
+redis_client = RedisCache()

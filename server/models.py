@@ -20,6 +20,8 @@ class CaseStatus(str, enum.Enum):
     PENDING = "PENDING"
     ERROR = "ERROR"
     DONE = "DONE"
+    APPROVED = "APPROVED"
+    DELIVERED = "DELIVERED"
 
 
 class AttachmentStatus(str, enum.Enum):
@@ -38,6 +40,7 @@ class Case(Base):
     finished_at = Column(DateTime(timezone=True), nullable=True)  # <-- Campo agregado
     status = Column(Enum(CaseStatus), default=CaseStatus.PENDING, nullable=False)
     delivered = Column(Boolean, default=False, nullable=False)
+    summary = Column(Text, nullable=True)
 
     # Relaciones
     attachments = relationship(
@@ -63,6 +66,7 @@ class Attachment(Base):
     status = Column(
         Enum(AttachmentStatus), default=AttachmentStatus.PENDING, nullable=False
     )
+    extracted_text = Column(Text, nullable=True)
     brief = Column(Text, nullable=True)
     findings = Column(Text, nullable=True)
     created_at = Column(

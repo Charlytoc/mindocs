@@ -1,15 +1,17 @@
 import os
 from datetime import datetime
-
+import socketio
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 
 from server.utils.printer import Printer
 from server.routes import router
-
+from server.managers.socket_server import sio
+from server.managers.notifications import redis_to_socketio_bridge
 
 printer = Printer("MAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "prod").lower().strip()
@@ -24,7 +26,13 @@ os.makedirs("uploads/documents/read", exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     printer.green("Iniciando aplicación, hora: ", datetime.now())
+    task = asyncio.create_task(redis_to_socketio_bridge())
     yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(lifespan=lifespan)
@@ -61,6 +69,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+sio_asgi_app = socketio.ASGIApp(socketio_server=sio, other_asgi_app=app)
 
 
 @app.middleware("http")
@@ -118,7 +128,12 @@ async def auth_and_cors(request: Request, call_next):
 
 app.include_router(router)
 
+app.mount("/socket.io", sio_asgi_app)
 app.mount("/", StaticFiles(directory="client/dist", html=True), name="client")
+
+# app.add_route("/socket.io/", route=sio_asgi_app, methods=["GET", "POST"])
+# app.add_websocket_route("/socket.io/", route=sio_asgi_app)
+
 
 PORT = int(os.getenv("PORT", 8005))
 

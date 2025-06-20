@@ -13,7 +13,7 @@ REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 # Inicializa Celery
 celery = Celery(
-    "sentencia_tasks",
+    "worker_demandas",
     broker=REDIS_URL,
     backend=REDIS_URL,
 )

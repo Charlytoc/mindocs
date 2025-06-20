@@ -120,6 +120,30 @@ table td {
 
 .markdown-container {
   line-height: 1.2;
+  max-width: 816px; /* Letter size width (8.5 inches) */
+  margin: 0 auto;
+
+  > h1 {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 1.5rem 0 1rem 0;
+    color: #1f2937;
+  }
+
+  > h2 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 1.25rem 0 0.75rem 0;
+    color: #374151;
+  }
+
+  > h3 {
+    font-size: 1.25rem;
+    font-weight: bold;
+    margin: 1rem 0 0.5rem 0;
+    color: #4b5563;
+  }
+
   > blockquote {
     background-color: var(--primary-color);
     color: white;

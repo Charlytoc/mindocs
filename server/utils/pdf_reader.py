@@ -67,10 +67,10 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
                     img = Image.open(io.BytesIO(pix.tobytes()))
                     text = pytesseract.image_to_string(img)
 
-                if could_contain_digital_signature(text):
-                    printer.magenta(
-                        f"Page {page.number} could contain digital signature"
-                    )
+                # if could_contain_digital_signature(text):
+                #     printer.magenta(
+                #         f"Page {page.number} could contain digital signature"
+                #     )
 
                 pages.append(text)
         return PAGE_CONNECTOR.join(pages)
