@@ -12,6 +12,18 @@ export const sendFilesInitialDemand = async (formData: FormData) => {
     throw new Error("Hubo un error al generar el resumen de la sentencia");
   }
 };
+export const sendFilesSecondFormat = async (formData: FormData) => {
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/upload-files-two`,
+      formData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al generar resumen de la sentencia:", error);
+    throw new Error("Hubo un error al generar el resumen de la sentencia");
+  }
+};
 
 export const getSentence = async (hash: string) => {
   try {

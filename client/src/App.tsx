@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { FileUploader } from "./components/Files/FileUploader";
+import { FormularioDemandas } from "./components/Files/FormularioDemandas";
 import { Waiter } from "./components/Waiter/Waiter";
 import { Results } from "./components/Results/Results";
+import { Formulario2 } from "./components/Files/Formulario2";
 
 function App() {
   const [caseId, setCaseId] = useState<string | null>(null);
@@ -29,7 +30,10 @@ function App() {
   };
 
   return (
-    <div>
+    <div
+      className="bg-gray-100"
+      style={{ scrollBehavior: "smooth", scrollbarWidth: "none" }}
+    >
       {caseId ? (
         processCompleted ? (
           <Results caseId={caseId} />
@@ -37,7 +41,10 @@ function App() {
           <Waiter caseId={caseId} onFinish={handleFinish} />
         )
       ) : (
-        <FileUploader onUploadSuccess={handleUploadSuccess} />
+        <>
+          <FormularioDemandas onUploadSuccess={handleUploadSuccess} />
+          {/* <Formulario2 onUploadSuccess={handleUploadSuccess} /> */}
+        </>
       )}
     </div>
   );

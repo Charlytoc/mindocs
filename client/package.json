@@ -11,7 +11,11 @@
     "watch": "vite build --watch"
   },
   "dependencies": {
+    "@tailwindcss/typography": "^0.5.16",
     "@tailwindcss/vite": "^4.1.3",
+    "@tiptap/extension-text-align": "^2.22.3",
+    "@tiptap/react": "^2.22.3",
+    "@tiptap/starter-kit": "^2.22.3",
     "axios": "^1.8.4",
     "clsx": "^2.1.1",
     "react": "^19.0.0",

@@ -7,9 +7,10 @@ import fitz  # PyMuPDF
 from fitz import Document as FPDFDocument
 from server.utils.printer import Printer
 import pytesseract
-
+import base64
 from PIL import Image
 import io
+from server.ai.ai_interface import AIInterface
 from docx import Document
 
 PAGE_CONNECTOR = "\n---PAGE---\n"
@@ -51,6 +52,16 @@ def could_contain_digital_signature(text: str) -> bool:
     ]
     return any(term in text.lower() for term in suspect_terms)
 
+
+def get_base64_image(page: fitz.Page) -> str:
+    pix = page.get_pixmap()
+    img = Image.open(io.BytesIO(pix.tobytes()))
+    buffered = io.BytesIO()
+    img.save(buffered, format="PNG")
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    return img_str
+
+
 class PyMuPDFWithOCRStrategy(DocumentStrategy):
     SAMPLE_PAGES = 4
 
@@ -63,14 +74,35 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
             for page in pdf:
                 text = page.get_text()
                 if not text.strip() or what_to_do == "OCR":
-                    pix = page.get_pixmap()
-                    img = Image.open(io.BytesIO(pix.tobytes()))
-                    text = pytesseract.image_to_string(img)
-
-                # if could_contain_digital_signature(text):
-                #     printer.magenta(
-                #         f"Page {page.number} could contain digital signature"
-                #     )
+                    printer.yellow(
+                        f"Page {page.number} could contain images, extracing with AI..."
+                    )
+                    ai = AIInterface(
+                        provider=os.getenv("PROVIDER", "ollama"),
+                        api_key=os.getenv("PROVIDER_API_KEY", "asdasd"),
+                        base_url=os.getenv("PROVIDER_BASE_URL", None),
+                    )
+                    img_str = get_base64_image(page)
+                    text = ai.chat(
+                        model=os.getenv("MODEL", "gemma3"),
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Extrae el texto de la imagen así como un resumen de la imagen, si no hay texto, solo explica en qué consiste la imagen. Esta imagen es parte de un documento PDF, por lo que el texto que extraigas debe ser parte del documento PDF.",
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{img_str}"
+                                        },
+                                    },
+                                ],
+                            }
+                        ],
+                    )
 
                 pages.append(text)
         return PAGE_CONNECTOR.join(pages)

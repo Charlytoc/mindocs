@@ -3,8 +3,9 @@ import { FileInput } from "./FileInput";
 import { Modal } from "../Modal/Modal";
 import { sendFilesInitialDemand } from "../../utils/api";
 import toast from "react-hot-toast";
+import MultiSelect from "./MultiSelect";
 
-type FileUploaderProps = {
+type FormularioDemandasProps = {
   onUploadSuccess?: ({ case_id }: { case_id: string }) => void;
 };
 
@@ -14,13 +15,16 @@ export type HashedFile = {
   hash: string;
 };
 
-export const FileUploader: React.FC<FileUploaderProps> = ({
+export const FormularioDemandas: React.FC<FormularioDemandasProps> = ({
   onUploadSuccess,
 }) => {
   const resumenDelCasoRef = useRef<HTMLTextAreaElement>(null);
+  const abogadosAsociadosRef = useRef<HTMLTextAreaElement>(null);
+  const juzgadoRef = useRef<HTMLInputElement>(null);
   // const clientId = useStore((state) => state.clientId);
   const [isOpen, setIsOpen] = useState(false);
   const [files, setFiles] = useState<FileList | null>(null);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -41,6 +45,19 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       if (resumenDelCasoRef.current) {
         formData.append("resumen_del_caso", resumenDelCasoRef.current.value);
       }
+      formData.append("selected_items", selectedItems.join(","));
+
+      if (abogadosAsociadosRef.current) {
+        formData.append(
+          "abogados_asociados",
+          abogadosAsociadosRef.current.value
+        );
+      }
+
+      if (juzgadoRef.current) {
+        formData.append("juzgado", juzgadoRef.current.value);
+      }
+
       const response = await sendFilesInitialDemand(formData);
       setIsOpen(false);
       setIsLoading(false);
@@ -77,11 +94,49 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           className="max-w-lg p-6 rounded-lg flex flex-col gap-4"
         >
           <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">
-            Subir Archivos
+            Carga la información del caso
           </h2>
+          <input
+            ref={juzgadoRef}
+            name="juzgado"
+            placeholder="Nombre del juzgado"
+            readOnly
+            value={"Juzgado Ficticio de Toluca"}
+            className="w-full p-2 border border-gray-300 rounded-md"
+          />
+
+          <MultiSelect
+            options={[
+              { label: "Divorcio incausado", value: "divorcio_incausado" },
+              {
+                label: "Pensión alimenticia",
+                value: "pension_alimenticia",
+              },
+              {
+                label: "Separación de bienes",
+                value: "divorcio_separacion_bienes",
+              },
+              { label: "Violencia familiar", value: "violencia_familiar" },
+              {
+                label: "Guarda y custodia de menores",
+                value: "guarda_y_custodia_de_menores",
+              },
+              {
+                label: "Sucesorio intestamentario",
+                value: "sucesorio_intestamentario",
+              },
+              {
+                label: "Identidad de personas",
+                value: "identidad_de_personas",
+              },
+            ]}
+            selectedValues={selectedItems}
+            onChange={setSelectedItems}
+            placeholder="Selecciona los puntos relevantes del caso"
+          />
 
           <FileInput
-            label="Archivos (imágenes y documentos)"
+            label="Anexos del caso"
             accept="image/*,.pdf,.doc,.docx,.txt"
             multiple={true}
             name="files"
@@ -92,6 +147,12 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
             ref={resumenDelCasoRef}
             name="resumen_del_caso"
             placeholder="Resumen del caso: Explicar brevemente el caso, los hechos, los demandados, los demandantes, etc."
+            className="w-full h-40 p-2 border border-gray-300 rounded-md"
+          ></textarea>
+          <textarea
+            ref={abogadosAsociadosRef}
+            name="abogados_asociados"
+            placeholder="Nombre de los abogados asociados al caso"
             className="w-full h-40 p-2 border border-gray-300 rounded-md"
           ></textarea>
 

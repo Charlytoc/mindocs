@@ -139,7 +139,6 @@ def on_both_documents_generated(self, results, case_id: str):
         ),
     )
 
-    # Update the case status to COMPLETED
     with session_context_sync() as session:
         case = session.execute(select(Case).where(Case.id == case_id))
         case.status = CaseStatus.DONE

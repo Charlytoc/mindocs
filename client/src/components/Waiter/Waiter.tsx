@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import socket from "../../infrastructure/socket";
 import { getCaseStatus } from "../../utils/api";
 
@@ -8,6 +8,7 @@ type WaiterProps = {
 };
 
 export const Waiter = ({ caseId, onFinish }: WaiterProps) => {
+  const logsContainerRef = useRef<HTMLDivElement>(null);
   const [logs, setLogs] = useState<string[]>([
     "Archivos recibidos",
     "Leyendo archivos",
@@ -63,6 +64,15 @@ export const Waiter = ({ caseId, onFinish }: WaiterProps) => {
     };
   }, [caseId]);
 
+  useEffect(() => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTo({
+        top: logsContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  }, [logs]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 w-full">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
@@ -81,15 +91,12 @@ export const Waiter = ({ caseId, onFinish }: WaiterProps) => {
           </div>
         </div>
 
-        {/* <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600">
-            ID del caso:{" "}
-            <span className="font-mono text-gray-800">{caseId}</span>
-          </p>
-        </div> */}
-
         {/* Progress Indicators */}
-        <div className="space-y-1 mb-6 max-h-96 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200 p-1">
+        <div
+          className="space-y-1 mb-6 max-h-96 overflow-y-auto bg-gray-50 rounded-lg border border-gray-200 p-1"
+          ref={logsContainerRef}
+          style={{ scrollbarWidth: "none" }}
+        >
           {logs.map((log, index) => (
             <div
               key={index}

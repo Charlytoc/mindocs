@@ -69,8 +69,11 @@ def extract_and_update_attachments_text(case_id: str):
                     printer.error(f"Error al procesar {file_path}: {e}")
 
             session.commit()
-      
-            header = [analyze_attachment.s(str(attachment.id), str(case_id)) for attachment in attachments]
+
+            header = [
+                analyze_attachment.s(str(attachment.id), str(case_id))
+                for attachment in attachments
+            ]
             # Dispara el chord: cuando todas las tareas terminen, ejecuta la callback
             chord(header)(on_all_analyses_done.s(str(case_id)))
             printer.green("Todos los attachments procesados y actualizados.")

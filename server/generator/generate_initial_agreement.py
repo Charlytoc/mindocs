@@ -11,7 +11,7 @@ from datetime import datetime
 printer = Printer("GENERATE_INITIAL_AGREEMENT")
 
 
-def read_machote_template(template_name: str = "convenio_divorcio_incausado") -> str:
+def read_machote_template(template_name: str = "convenio") -> str:
     """Lee el template HTML del machote especificado."""
     template_path = f"server/machotes/{template_name}.html"
     try:
@@ -22,7 +22,7 @@ def read_machote_template(template_name: str = "convenio_divorcio_incausado") ->
         return ""
 
 
-def get_attachments_data(case_id: str) -> list:
+def get_attachments_data(case_id: str) -> str:
     """Obtiene todos los attachments analizados para un caso."""
     with session_context_sync() as session:
         attachments = (
@@ -46,7 +46,7 @@ def get_attachments_data(case_id: str) -> list:
                 }
             )
 
-        return attachments_data
+        return json.dumps(attachments_data, indent=2, ensure_ascii=False)
 
 
 def get_case_summary(case_id: str) -> str:
@@ -91,7 +91,7 @@ def generate_initial_agreement(case_id: str):
 
     try:
         # Leer el template HTML
-        html_template = read_machote_template("convenio_divorcio_incausado")
+        html_template = read_machote_template("convenio")
         if not html_template:
             raise Exception("No se pudo leer el template HTML del convenio")
 
@@ -123,6 +123,7 @@ def generate_initial_agreement(case_id: str):
             "Debes generar el HTML del convenio reemplazando las variables del template con la información extraída de los documentos. "
             "IMPORTANTE: Considera el contexto del caso proporcionado por el abogado al generar el convenio. "
             "Asegúrate de que el convenio refleje los hechos y circunstancias descritas en el resumen del caso. "
+            "El documento producido no debe tener nada que no sea útil para el caso. "
             f"La fecha actual es {current_date}." + summary_context
         )
 
@@ -131,7 +132,7 @@ Template HTML del Convenio:
 {html_template}
 
 Datos de los attachments analizados:
-{json.dumps(attachments_data, indent=2, ensure_ascii=False)}
+{attachments_data}
 
 Genera el HTML completo del convenio inicial reemplazando todas las variables con la información extraída de los attachments.
 """

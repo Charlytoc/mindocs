@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@plugin "@tailwindcss/typography";
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -119,8 +121,8 @@ table td {
 }
 
 .markdown-container {
-  line-height: 1.2;
-  max-width: 816px; /* Letter size width (8.5 inches) */
+  line-height: 1.5;
+  max-width: 816px;
   margin: 0 auto;
 
   > h1 {
@@ -158,6 +160,9 @@ table td {
 
     & li {
       list-style-position: inside;
+      > *:first-child {
+        display: inline-block !important;
+      }
     }
   }
 
@@ -167,6 +172,9 @@ table td {
 
     & li {
       list-style-position: inside;
+      > p:first-child {
+        display: inline-block !important;
+      }
     }
   }
 }

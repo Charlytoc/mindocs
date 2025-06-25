@@ -114,7 +114,7 @@ export const Results = ({ caseId }: ResultsProps) => {
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center ">
           <div className="text-red-500 mb-4">
             <svg
               className="w-12 h-12 mx-auto"
@@ -159,17 +159,7 @@ export const Results = ({ caseId }: ResultsProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Documentos Generados
-          </h1>
-          <p className="text-gray-600 mb-4">
-            Caso ID: <span className="font-mono text-gray-800">{caseId}</span>
-          </p>
-        </div>
-
+      <div className="max-w-6xl mx-auto ">
         {/* Tabs */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="flex border-b border-gray-200">
@@ -184,7 +174,7 @@ export const Results = ({ caseId }: ResultsProps) => {
                   : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"
               }`}
             >
-              Demanda Inicial
+              Escrito Inicial
             </button>
             <button
               onClick={() => {
@@ -202,7 +192,7 @@ export const Results = ({ caseId }: ResultsProps) => {
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-6 bg-gray-100">
             {hasContent ? (
               isEditing ? (
                 <RichTextEditor
@@ -214,10 +204,10 @@ export const Results = ({ caseId }: ResultsProps) => {
                   isRequestingAI={isRequestingAI}
                 />
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 ">
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold text-gray-800">
-                      {activeTab === "demand" ? "Demanda Inicial" : "Convenio"}
+                      {activeTab === "demand" ? "Escrito Inicial" : "Convenio"}
                     </h3>
                     <button
                       onClick={handleEdit}
@@ -239,12 +229,10 @@ export const Results = ({ caseId }: ResultsProps) => {
                       Editar
                     </button>
                   </div>
-                  <div className="markdown-container">
-                    <div
-                      className="bg-gray-50 rounded-lg p-6 border border-gray-200"
-                      dangerouslySetInnerHTML={{ __html: currentContent || "" }}
-                    />
-                  </div>
+                  <div
+                    className="bg-gray-50 rounded-lg p-6 border border-gray-200 prose max-w-[816px] mx-auto"
+                    dangerouslySetInnerHTML={{ __html: currentContent || "" }}
+                  />
                 </div>
               )
             ) : (
@@ -274,7 +262,6 @@ export const Results = ({ caseId }: ResultsProps) => {
           </div>
         </div>
 
-        {/* Action Buttons */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mt-6">
           <div className="flex justify-center gap-4">
             <button

@@ -46,6 +46,25 @@ def extract_brief_and_findings(text: str) -> dict:
     }
 
 
+# completion = client.chat.completions.create(
+#     model="gpt-4.1",
+#     messages=[
+#         {
+#             "role": "user",
+#             "content": [
+#                 { "type": "text", "text": "what's in this image?" },
+#                 {
+#                     "type": "image_url",
+#                     "image_url": {
+#                         "url": f"data:image/jpeg;base64,{base64_image}",
+#                     },
+#                 },
+#             ],
+#         }
+#     ],
+# )
+
+
 def analyze_text_with_ai(attachment_id: str, case_id: str):
     with session_context_sync() as session:
         attachment = session.get(Attachment, attachment_id)
@@ -53,7 +72,7 @@ def analyze_text_with_ai(attachment_id: str, case_id: str):
             printer.error(f"No se encontró el attachment {attachment_id}")
             return None
         if not attachment.extracted_text:
-            printer.error(f"No hay texto extraído para el attachment {attachment_id}")
+            printer.error(f"No hay texto extraído para el attachment {attachment.name}")
             return None
         text = attachment.extracted_text
 
@@ -78,8 +97,7 @@ def analyze_text_with_ai(attachment_id: str, case_id: str):
         "Eres un asistente legal. Extrae la información relevante del siguiente documento. "
         "Que pueda ser útil para la generación de la demanda inicial del caso en cuestión. "
         "Debes returnar tu respuesta en un formato XML de la siguiente manera: "
-        "<brief> Resumen del documento </brief><findings> Puntos relevantes del documento que puedan ser útiles para la generación de la demanda inicial, datos, nombres, fechas, montos, etc. </findings>. Durante el proceso de extracción, debes tener en cuenta las variables que se encuentran en el siguiente diccionario, extrae todas las que sean posibles dentro de <findings> y <brief>. Si no encuentras alguna variable, no la incluyas en el XML."
-        + get_variables_from_html()
+        "<brief> Resumen del documento </brief><findings> Puntos relevantes del documento que puedan ser útiles para la generación de la demanda inicial, datos, nombres, fechas, montos, etc. </findings>. Durante el proceso de extracción, debes tener en cuenta las variables que se encuentran en el siguiente diccionario, extrae todas las que sean posibles dentro de <findings> y <brief>."
         + summary_context
         + "IMPORTANTE: Considera el contexto del caso proporcionado por el abogado al analizar este documento. "
         "Relaciona la información del documento con los hechos descritos en el resumen del caso."
@@ -124,7 +142,8 @@ def analyze_text_with_ai(attachment_id: str, case_id: str):
             {
                 "case_id": case_id,
                 "attachment_id": attachment_id,
-                "ai_analysis": response,
+                "ai_analysis": result,
+                "response": response,
                 "log": f"Análisis IA guardado para {attachment_id}",
             }
         ),

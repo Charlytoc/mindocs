@@ -1,9 +1,9 @@
 import subprocess
 
-input_filename = "server/machotes/divorcio_incausado.docx"
-# input_filename = "server/machotes/convenio_divorcio_incausado.docx"
+# input_filename = "server/machotes/demanda.docx"
+input_filename = "server/machotes/convenio.docx"
 # output_filename = "server/machotes/convenio_divorcio_incausado.html"
-output_filename = "server/machotes/divorcio_incausado.html"
+output_filename = "server/machotes/convenio.html"
 
 # Ejecuta el comando pandoc
 result = subprocess.run(
