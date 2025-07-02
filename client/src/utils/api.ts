@@ -9,7 +9,7 @@ export const sendFilesInitialDemand = async (formData: FormData) => {
     return response.data;
   } catch (error) {
     console.error("Error al generar resumen de la sentencia:", error);
-    throw new Error("Hubo un error al generar el resumen de la sentencia");
+  throw new Error("Hubo un error al generar el resumen de la sentencia");
   }
 };
 export const sendFilesSecondFormat = async (formData: FormData) => {

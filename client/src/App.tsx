@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { FormularioDemandas } from "./components/Files/FormularioDemandas";
 import { Waiter } from "./components/Waiter/Waiter";
 import { Results } from "./components/Results/Results";
-import { Formulario2 } from "./components/Files/Formulario2";
+import { Formulario } from "./components/Files/Formulario";
 
 function App() {
   const [caseId, setCaseId] = useState<string | null>(null);
@@ -42,8 +41,8 @@ function App() {
         )
       ) : (
         <>
-          <FormularioDemandas onUploadSuccess={handleUploadSuccess} />
-          {/* <Formulario2 onUploadSuccess={handleUploadSuccess} /> */}
+          {/* <FormularioDemandas onUploadSuccess={handleUploadSuccess} /> */}
+          <Formulario onUploadSuccess={handleUploadSuccess} />
         </>
       )}
     </div>

@@ -124,6 +124,7 @@ def generate_initial_agreement(case_id: str):
             "IMPORTANTE: Considera el contexto del caso proporcionado por el abogado al generar el convenio. "
             "Asegúrate de que el convenio refleje los hechos y circunstancias descritas en el resumen del caso. "
             "El documento producido no debe tener nada que no sea útil para el caso. "
+            "El juzgado a cargo debe aparecer exactamente como se proporcionó en el formulario si se hace mención"
             f"La fecha actual es {current_date}." + summary_context
         )
 

@@ -4,6 +4,7 @@ type FileInputProps = {
   multiple?: boolean;
   onChange: (files: FileList | null) => void;
   name: string;
+  required?: boolean;
 };
 
 export const FileInput: React.FC<FileInputProps> = ({
@@ -12,10 +13,12 @@ export const FileInput: React.FC<FileInputProps> = ({
   multiple = false,
   onChange,
   name,
+  required = false,
 }) => (
-  <div className="mb-4">
+  <div className="mb-4 flex flex-row gap-2 items-center">
     <label className="block text-sm font-medium text-gray-700">{label}</label>
     <input
+      required={required}
       name={name}
       type="file"
       accept={accept}

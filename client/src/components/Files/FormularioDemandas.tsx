@@ -101,7 +101,7 @@ export const FormularioDemandas: React.FC<FormularioDemandasProps> = ({
             name="juzgado"
             placeholder="Nombre del juzgado"
             readOnly
-            value={"Juzgado Ficticio de Toluca"}
+            value={"Juzgado Familiar Ficticio de Toluca"}
             className="w-full p-2 border border-gray-300 rounded-md"
           />
 

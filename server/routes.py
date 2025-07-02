@@ -3,8 +3,13 @@ import tempfile
 import subprocess
 from typing import List
 import shutil
-from fastapi import APIRouter, UploadFile, File, Depends, Form, HTTPException
+import traceback
+
+from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException
+from typing import List, Optional
 from fastapi.responses import JSONResponse
+
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from server.utils.printer import Printer
 from server.utils.csv_logger import CSVLogger
@@ -33,7 +38,7 @@ async def upload_files(
     abogados_asociados: str = Form(...),
 ):
     try:
-        summary = f"Resumen del caso proporcionado por el usuario: {resumen_del_caso}\n\nTipos de demanda seleccionados por el usuario: {selected_items}\n\nAbogados asociados al caso: {abogados_asociados}\n\nJuzgado a cargo: {juzgado}"
+        summary = f"Resumen del caso proporcionado por el usuario: {resumen_del_caso}\n\nTipos de demanda seleccionados por el usuario: {selected_items}\n\nAbogados asociados al caso: {abogados_asociados}\n\nJuzgado a cargo (en todos los documentos debe aparecer exactamente así): {juzgado}"
 
         case = Case(status=CaseStatus.PENDING, summary=summary)
         session.add(case)
@@ -92,71 +97,91 @@ async def upload_files(
 
 @router.post("/upload-files-two")
 async def upload_files_two(
-    solicitante: str = Form(...),
-    demandado: str = Form(...),
-    solicitante_adjuntos: List[UploadFile] = File(...),
-    demandado_adjuntos: List[UploadFile] = File(...),
-    abogados_adjuntos: List[UploadFile] = File(...),
-    anexos: List[UploadFile] = File(...),
     juzgado: str = Form(...),
-    session: AsyncSession = Depends(get_session),
+    acta_de_matrimonio: UploadFile = File(...),
+    solicitante_adjuntos: UploadFile = File(...),
+    propuesta_convenio: str = Form(...),
+    propuesta_convenio_file: Optional[UploadFile] = File(None),
+    hijos: str = Form(...),
+    hijos_files: Optional[List[UploadFile]] = File(None),
+    convenio: Optional[UploadFile] = File(None),
+    otros_anexos: Optional[List[UploadFile]] = File(None),
+    session: "AsyncSession" = Depends(get_session),
 ):
+    # print(hijos, "hijos")
+    # print(hijos_files, "hijos_files")
+    # print(propuesta_convenio, "propuesta_convenio")
+    # print(propuesta_convenio_file, "propuesta_convenio_file")
+    # print(convenio, "convenio")
+    # print(otros_anexos, "otros_anexos")
+    # print(juzgado, "juzgado")
+    # print(solicitante_adjuntos, "solicitante_adjuntos")
+    # print(acta_de_matrimonio, "acta_de_matrimonio")
+
     try:
-        summary = f"""        
-Juzgado a cargo: {juzgado}
-Solicitante: {solicitante}
-Demandado: {demandado}
+        summary = f"""        p
+Juzgado a cargo (en todos los documentos debe aparecer exactamente así): {juzgado}
 """
-        document_reader = DocumentReader()
-        temp_dir = tempfile.mkdtemp()
-        for file in abogados_adjuntos:
-            # Save the file to the case directory
-            file_path = f"{temp_dir}/{file.filename}"
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
 
-            content = document_reader.read(file_path)
-            summary += f"\n\nAbogados adjuntos: {content}"
+        summary += f"\nActa de Matrimonio: {acta_de_matrimonio.filename}"
+        summary += (
+            f"\nAdjunto del solicitante (Acta, INE): {solicitante_adjuntos.filename}"
+        )
 
-        shutil.rmtree(temp_dir)
+        if hijos:
+            for idx, hijo_file in enumerate(hijos_files):
+                summary += f"\nActa de nacimiento de hijo {idx+1}: {hijo_file.filename}"
 
+        if convenio:
+            summary += f"\nConvenio: {convenio.filename}"
+
+        if otros_anexos:
+            for idx, anexo in enumerate(otros_anexos):
+                summary += f"\nOtro anexo {idx+1}: {anexo.filename}"
+
+        # --- Guardado de archivos y base de datos ---
         case = Case(status=CaseStatus.PENDING, summary=summary)
         session.add(case)
         await session.flush()  # Para obtener el ID del caso
 
         case_upload_path = f"{UPLOADS_PATH}/{case.id}"
-        # Crear directorio para el caso
         os.makedirs(case_upload_path, exist_ok=True)
 
         attachments = []
+        idx = 1
 
-        all_files = [*solicitante_adjuntos, *demandado_adjuntos, *anexos]
-
-        for index, file in enumerate(all_files, 1):
-            # Crear el attachment en la base de datos
+        def save_and_attach(file: UploadFile, anexo: int, name: str):
             attachment = Attachment(
                 case_id=case.id,
-                name=file.filename,
-                anexo=index,
+                name=name,
+                anexo=anexo,
                 status=AttachmentStatus.PENDING,
             )
             session.add(attachment)
-            await session.flush()
+            return attachment
 
-            file_extension = (
-                os.path.splitext(file.filename)[1] if "." in file.filename else ""
-            )
-            file_path = f"{case_upload_path}/{attachment.id}{file_extension}"
-
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-
-            attachments.append(attachment)
+        all_files = [
+            acta_de_matrimonio,
+            solicitante_adjuntos,
+            convenio,
+            propuesta_convenio_file,
+            *(hijos_files or []),
+            *(otros_anexos or []),
+        ]
+        for file in all_files:
+            if file:
+                attachment = save_and_attach(file, idx, file.filename)
+                await session.flush()
+                ext = os.path.splitext(file.filename)[1]
+                file_path = f"{case_upload_path}/{attachment.id}{ext}"
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                attachments.append(attachment)
+                idx += 1
 
         await session.commit()
 
         printer.info(f"Case {case.id} created with {len(attachments)} attachments")
-
         read_attachments.delay(case.id)
 
         return JSONResponse(
@@ -164,11 +189,14 @@ Demandado: {demandado}
                 "case_id": str(case.id),
                 "attachments_count": len(attachments),
                 "status": case.status.value,
+                "summary": summary,
             }
         )
 
     except Exception as e:
         await session.rollback()
+        # print all the traceback
+        traceback.print_exc()
         printer.error(f"Error uploading files: {str(e)}")
         return JSONResponse(
             status_code=500,

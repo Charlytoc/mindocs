@@ -1,4 +1,5 @@
 # utils/document_reader.py
+import subprocess
 
 from abc import ABC, abstractmethod
 import os
@@ -146,6 +147,17 @@ class MarkdownStrategy(DocumentStrategy):
             return f.read()
 
 
+class DocPandocStrategy(DocumentStrategy):
+    def read(self, path: str) -> str:
+        result = subprocess.run(
+            ["pandoc", path, "-t", "plain"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout
+
+
 # =========================
 # Lector de documentos
 # =========================
@@ -166,6 +178,8 @@ class DocumentReader:
             return DocxStrategy()
         elif ext == ".md":
             return MarkdownStrategy()
+        elif ext == ".doc":
+            return DocPandocStrategy()
         else:
             raise ValueError(f"Tipo de archivo '{ext}' no soportado")
 

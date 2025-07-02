@@ -110,12 +110,14 @@ def generate_initial_demand(case_id: str):
 
         system_prompt = (
             "Eres un asistente legal especializado en la generación de demandas iniciales. "
-            "Tu tarea es generar una demanda inicial para un caso basándote en el análisis de los documentos proporcionados. Y los tipos de demanda seleccionados por el usuario."
-            "Debes generar el HTML de la demanda inicial, reemplazando las variables que correspondan del ejemplo proporcionado, eliminando las partes innecesarias para el caso cuando sea menester, y agregando las partes necesarias para el caso."
-            "Asegúrate de que la demanda refleje los hechos y circunstancias descritas en el resumen del caso."
+            "Tu tarea es generar una demanda inicial para un caso basándote en el análisis de los documentos proporcionados y los tipos de demanda seleccionados por el usuario."
+            "Debes generar el HTML del escrito inicial, reemplazando las partes que correspondan del ejemplo proporcionado y eliminando las partes innecesarias para el caso cuando sea menester."
+            "Asegúrate de que el escrito refleje los hechos y circunstancias descritas en el resumen del caso."
             f"La fecha actual es {current_date}."
-            "Este es el template de la demanda inicial:"
+            "Este es el template del escrito inicial:"
             f"{html_template}"
+            "No es necesario que se siga el template al pie de la letra, solo que se siga el formato general y que incluya las partes necesarias para el caso."
+            "El juzgado a cargo debe aparecer exactamente como se proporcionó en el formulario si se hace mención a él."
         )
 
         user_prompt = f"""
@@ -129,7 +131,7 @@ Resumen del caso:
 {summary_context}
 ---
 
-Genera el HTML completo de la demanda inicial reemplazando todas las variables con la información extraída de los anexos y el resumen del caso. 
+Genera el HTML completo del escrito inicial reemplazando las partes que correspondan con la información extraída de los anexos y el resumen del caso. No debes agregar nada que no sea necesario para el caso. El juzgado a cargo debe aparecer exactamente como se proporcionó en el formulario.
 
 
 Si falta algún dato o documento necesario según el tipo de demanda: Por ejemplo: Si se requiere separación de bienes, deben haber anexos que hagan referencia a los bienes. O si hay guardia y custodia de menores, deben haber anexos que hagan referencia a los menores. En casos donde algún documento haga falta, díceilo al usuario en un warning al final de la demanda.
