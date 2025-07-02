@@ -1,7 +1,6 @@
 node_modules
 venv
 client/node_modules
-client/dist
 
 __pycache__
 
@@ -29,3 +28,4 @@ faq_results.txt
 logs/*
 
 pgdata
+
