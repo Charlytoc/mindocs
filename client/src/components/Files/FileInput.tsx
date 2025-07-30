@@ -16,7 +16,7 @@ export const FileInput: React.FC<FileInputProps> = ({
   required = false,
 }) => (
   <div className="mb-4 flex flex-row gap-2 items-center">
-    <label className="block text-sm font-medium text-gray-700">{label}</label>
+    <label className="block text-xs text-gray-700">{label}</label>
     <input
       required={required}
       name={name}

@@ -2,11 +2,14 @@ import os
 from datetime import datetime
 import socketio
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.exceptions import HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 
 from server.utils.printer import Printer
 from server.routes import router
@@ -65,6 +68,7 @@ printer.green("ALLOWED_IPS: ", ALLOWED_IPS)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS if ALLOWED_ORIGINS != "*" else ["*"],
+    # allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -129,13 +133,21 @@ async def auth_and_cors(request: Request, call_next):
 app.include_router(router)
 
 app.mount("/socket.io", sio_asgi_app)
-app.mount("/", StaticFiles(directory="client/dist", html=True), name="client")
+app.mount(
+    "/assets", StaticFiles(directory="client/dist/assets", html=True), name="client"
+)
 
-# app.add_route("/socket.io/", route=sio_asgi_app, methods=["GET", "POST"])
-# app.add_websocket_route("/socket.io/", route=sio_asgi_app)
+
+@app.get("/{full_path:path}")
+async def spa_catch_all(full_path: str):
+    printer.red("spa_catch_all: ", full_path)
+    # Puedes agregar filtros si quieres omitir /api, /uploads, etc.
+    if full_path.startswith(("api/", "socket.io", "uploads/")):
+        raise StarletteHTTPException(status_code=404, detail="Not Found")
+    return FileResponse("client/dist/index.html")
 
 
-PORT = int(os.getenv("PORT", 8005))
+PORT = int(os.getenv("PORT", 8006))
 
 if __name__ == "__main__":
     import uvicorn

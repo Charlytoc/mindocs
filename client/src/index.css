@@ -122,7 +122,7 @@ table td {
 
 .markdown-container {
   line-height: 1.5;
-  max-width: 816px;
+  /* max-width: 816px; */
   margin: 0 auto;
 
   > h1 {

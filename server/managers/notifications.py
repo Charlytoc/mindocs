@@ -6,6 +6,7 @@ import redis.asyncio as redis
 
 printer = Printer("NOTIFICATIONS")
 
+
 async def redis_to_socketio_bridge():
     r = redis.Redis.from_url(
         f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
@@ -14,20 +15,21 @@ async def redis_to_socketio_bridge():
     printer.green("Redis connected")
 
     pubsub = r.pubsub()
-    await pubsub.subscribe("case_updates")
+    await pubsub.subscribe("workflow_updates")
 
     try:
         async for message in pubsub.listen():
+            printer.green("Message received: ", message)
             if message["type"] == "message":
                 # printer.green("Message received")
                 data = json.loads(message["data"])
                 # printer.green("Message parsed")
 
-                case_id = data["case_id"]
+                workflow_id = data["workflow_execution_id"]
                 # printer.green(f"Case ID: {case_id}")
 
-                await sio.emit("case_update", data, room=f"case_{case_id}")
+                await sio.emit("workflow_update", data, room=f"workflow_{workflow_id}")
     finally:
-        await pubsub.unsubscribe("case_updates")
+        await pubsub.unsubscribe("workflow_updates")
         await pubsub.close()
         await r.close()

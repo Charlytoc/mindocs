@@ -1,5 +1,8 @@
 import os
 
+import inspect
+import json
+
 from ollama import Client
 from ..utils.printer import Printer
 from openai import OpenAI
@@ -87,6 +90,8 @@ class OllamaProvider:
 
 
 class OpenAIProvider:
+    messages: list[dict] = []
+
     def __init__(self, api_key: str, base_url: str = None):
         printer.blue(f"Using OpenAI base URL: {base_url}")
         self.client = OpenAI(api_key=api_key, base_url=base_url)
@@ -108,9 +113,83 @@ class OpenAIProvider:
             tools=tools,
             stream=stream,
         )
-        # printer.yellow(response, "RESPONSE")
 
-        return response.choices[0].message.content
+        return response
+
+    def agent_loop(
+        self,
+        messages: list[dict] = None,
+        model: str | None = None,
+        tools: list[dict] | list[callable] = [],
+        tools_fn_map: dict = None,
+        on_message: callable = None,
+    ):
+        """
+        Ejecuta un ciclo function-calling hasta que no haya tool_calls.
+        Llama a on_message(response) en cada iteración.
+        """
+        self.messages = messages.copy() if messages else self.messages.copy()
+        turns = 0
+
+        while True:
+            printer.yellow(self.messages, "MESSAGES")
+            response = self.chat(
+                messages=self.messages,
+                model=model,
+                stream=False,
+                tools=tools,
+            )
+            printer.yellow(response.choices[0].message, "RESPONSE")
+
+            # OpenAI: response.choices[0].message
+            if hasattr(response, "choices"):
+                msg = response.choices[0].message
+                if on_message:
+                    on_message(msg)
+
+                tool_calls = getattr(msg, "tool_calls", None)
+                if tool_calls:
+                    # Añade el mensaje assistant con tool_calls
+                    self.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": msg.content or "",
+                            "tool_calls": [tc.model_dump() for tc in tool_calls],
+                        }
+                    )
+                    # Ejecuta tools
+                    for tool_call in tool_calls:
+                        tool_name = tool_call.function.name
+                        args = json.loads(tool_call.function.arguments)
+                        # Ejecuta función local si está en el mapa
+                        if tools_fn_map and tool_name in tools_fn_map:
+                            result = tools_fn_map[tool_name](**args)
+                        else:
+                            result = f"Function {tool_name} not implemented."
+                        # Mensaje de tool
+                        self.messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": str(result),
+                            }
+                        )
+                    # Sigue el loop (nuevo turno)
+                    turns += 1
+                    continue
+                else:
+                    # Final, no hay tool_calls
+                    self.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": msg.content or "",
+                        }
+                    )
+                    if on_message:
+                        on_message(msg)
+                    break
+
+        return "Agent loop terminated"
 
 
 class AIInterface:
@@ -149,5 +228,58 @@ class AIInterface:
             stream=stream,
         )
 
+    def agent_loop(
+        self,
+        messages: list[dict] = None,
+        model: str | None = None,
+        tools: list[dict] | list[callable] = [],
+        tools_fn_map: dict = None,
+        on_message: callable = None,
+    ):
+        return self.client.agent_loop(
+            messages=messages,
+            model=model,
+            tools=tools,
+            tools_fn_map=tools_fn_map,
+            on_message=on_message,
+        )
+
     def check_model(self, model: str):
         return self.client.check_model(model)
+
+
+def function_to_openai_schema(fn, description=None):
+    sig = inspect.signature(fn)
+    props = {}
+    required = []
+    for name, param in sig.parameters.items():
+        # Solo soporta tipos simples: str, int, float, bool
+        ann = param.annotation
+        if ann == str:
+            type_ = "string"
+        elif ann == int:
+            type_ = "integer"
+        elif ann == float:
+            type_ = "number"
+        elif ann == bool:
+            type_ = "boolean"
+        else:
+            type_ = "string"  # fallback, podrías mejorar esto
+        props[name] = {"type": type_}
+        if param.default is inspect.Parameter.empty:
+            required.append(name)
+    schema = {
+        "type": "object",
+        "properties": props,
+        "required": required,
+        "additionalProperties": False,
+    }
+    return {
+        "type": "function",
+        "function": {
+            "name": fn.__name__,
+            "description": description or fn.__doc__ or fn.__name__,
+            "parameters": schema,
+            "strict": True,
+        },
+    }

@@ -84,7 +84,7 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
                         base_url=os.getenv("PROVIDER_BASE_URL", None),
                     )
                     img_str = get_base64_image(page)
-                    text = ai.chat(
+                    res = ai.chat(
                         model=os.getenv("MODEL", "gemma3"),
                         messages=[
                             {
@@ -104,7 +104,7 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
                             }
                         ],
                     )
-
+                    text = res.choices[0].message.content
                 pages.append(text)
         return PAGE_CONNECTOR.join(pages)
 

@@ -1,50 +1,72 @@
 import { useState, useEffect } from "react";
-import { Waiter } from "./components/Waiter/Waiter";
-import { Results } from "./components/Results/Results";
-import { Formulario } from "./components/Files/Formulario";
+// import { Waiter } from "./components/Waiter/Waiter";
+// import { Results } from "./components/Results/Results";
+import { Auth } from "./components/Auth/Auth";
+import { WorkflowList } from "./components/Workflows/WorkflowList";
+import { WorkflowUpload } from "./components/Workflows/WorkflowUpload";
+import { Navigation } from "./components/Navigation/Navigation";
+import { useAuthStore } from "./infrastructure/store";
+import { useNavigate } from "react-router";
+import { WorkflowForm } from "./components/Workflows/WorkflowForm";
+
+type AppState =
+  | "auth"
+  | "workflow-list"
+  | "workflow-upload"
+  | "processing"
+  | "results";
+
+interface Workflow {
+  id: string;
+  name: string;
+  description: string;
+}
 
 function App() {
-  const [caseId, setCaseId] = useState<string | null>(null);
-  const [processCompleted, setProcessCompleted] = useState(false);
+  const { isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Check URL parameters for legacy support
     const urlParams = new URLSearchParams(window.location.search);
-    const caseParam = urlParams.get("case");
-    if (caseParam) {
-      setCaseId(caseParam);
+
+    const executionParam = urlParams.get("execution");
+
+    if (executionParam) {
+      // setExecutionId(executionParam);
+      // setProcessCompleted(false);
+      navigate(`/workflow/${executionParam}`);
     }
   }, []);
 
-  const handleUploadSuccess = ({ case_id }: { case_id: string }) => {
-    setCaseId(case_id);
-    setProcessCompleted(false);
-    // Actualizar la URL con el process_id
-    const url = new URL(window.location.href);
-    url.searchParams.set("case", case_id);
-    window.history.pushState({}, "", url.toString());
+  // useEffect(() => {
+  //   if (!isAuthenticated) {
+  //     navigate("/");
+  //   }
+  // }, [isAuthenticated]);
+
+  const handleWorkflowSelect = (workflow: Workflow) => {
+    navigate(`/workflow/${workflow.id}`);
   };
 
-  const handleFinish = () => {
-    setProcessCompleted(true);
+  const handleUploadSuccess = ({ execution_id }: { execution_id: string }) => {
+    navigate(`/workflow/${execution_id}`);
   };
 
   return (
-    <div
-      className="bg-gray-100"
-      style={{ scrollBehavior: "smooth", scrollbarWidth: "none" }}
-    >
-      {caseId ? (
-        processCompleted ? (
-          <Results caseId={caseId} />
-        ) : (
-          <Waiter caseId={caseId} onFinish={handleFinish} />
-        )
-      ) : (
-        <>
-          {/* <FormularioDemandas onUploadSuccess={handleUploadSuccess} /> */}
-          <Formulario onUploadSuccess={handleUploadSuccess} />
-        </>
-      )}
+    <div className="min-h-screen bg-gray-100">
+      <Navigation />
+      <WorkflowList onSelectWorkflow={handleWorkflowSelect} />
+      <WorkflowForm />
+      {/* <WorkflowUpload
+        workflow={{
+          id: "1",
+          name: "Workflow 1",
+          description: "Workflow 1 description",
+        }}
+        onUploadSuccess={handleUploadSuccess}
+        onBack={() => {}}
+      /> */}
     </div>
   );
 }

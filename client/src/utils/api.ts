@@ -3,15 +3,230 @@ import axios from "axios";
 
 export const API_URL = "http://localhost:8006";
 
+// Auth functions
+export const signup = async (
+  email: string,
+  password: string,
+  name?: string
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+    if (name) formData.append("name", name);
+
+    const response = await axios.post(`${API_URL}/api/signup`, formData);
+    return response.data;
+  } catch (error) {
+    console.error("Error al registrarse:", error);
+    throw new Error("Hubo un error al registrarse");
+  }
+};
+
+export const login = async (email: string, password: string) => {
+  try {
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+
+    const response = await axios.post(`${API_URL}/api/login`, formData);
+    return response.data;
+  } catch (error) {
+    console.error("Error al iniciar sesión:", error);
+    throw new Error("Hubo un error al iniciar sesión");
+  }
+};
+
+export const deleteAccount = async (email: string, password: string) => {
+  try {
+    const formData = new FormData();
+    formData.append("email", email);
+    formData.append("password", password);
+
+    const response = await axios.delete(`${API_URL}/api/delete-account`, {
+      data: formData,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al eliminar cuenta:", error);
+    throw new Error("Hubo un error al eliminar la cuenta");
+  }
+};
+
+export const createWorkflow = async (formData: FormData, userEmail: string) => {
+  try {
+    const response = await axios.post(`${API_URL}/api/workflow`, formData, {
+      headers: { "x-user-email": userEmail },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al crear workflow:", error);
+    throw new Error("Hubo un error al crear el workflow");
+  }
+};
+
+export const deleteWorkflow = async (workflowId: string, userEmail: string) => {
+  try {
+    const response = await axios.delete(
+      `${API_URL}/api/workflow/${workflowId}`,
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al eliminar workflow:", error);
+    throw new Error("Hubo un error al eliminar el workflow");
+  }
+};
+
+export const getWorkflows = async (userEmail: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/api/workflows`, {
+      headers: { "x-user-email": userEmail },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener workflows:", error);
+    throw new Error("Hubo un error al obtener los workflows");
+  }
+};
+
+export const getWorkflow = async (workflowId: string, userEmail: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/api/workflow/${workflowId}`, {
+      headers: { "x-user-email": userEmail },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener workflow:", error);
+    throw new Error("Hubo un error al obtener el workflow");
+  }
+};
+
+export const updateWorkflow = async (
+  workflowId: string,
+  name: string,
+  description: string,
+  instructions: string,
+  userEmail: string
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("instructions", instructions);
+
+    const response = await axios.put(
+      `${API_URL}/api/workflow/${workflowId}`,
+      formData,
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al actualizar workflow:", error);
+    throw new Error("Hubo un error al actualizar el workflow");
+  }
+};
+
+export const getWorkflowExecution = async (
+  executionId: string,
+  userEmail: string
+) => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/api/workflow-execution/${executionId}`,
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener ejecución de workflow:", error);
+    throw new Error("Hubo un error al obtener la ejecución de workflow");
+  }
+};
+
+// Workflow execution
+export const startWorkflow = async (
+  workflowId: string,
+  files: File[],
+  descriptions: string[],
+  userEmail: string,
+  inputText?: string
+) => {
+  try {
+    const formData = new FormData();
+
+    formData.append("input_text", inputText || "");
+
+    files.forEach((file, index) => {
+      formData.append("input_files", file);
+      if (descriptions[index]) {
+        formData.append("input_descriptions", descriptions[index]);
+      }
+    });
+
+    const response = await axios.post(
+      `${API_URL}/api/start/${workflowId}`,
+      formData,
+      {
+        headers: {
+          "x-user-email": userEmail,
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al iniciar workflow:", error);
+    throw new Error("Hubo un error al iniciar el workflow");
+  }
+};
+
+export const getWorkflowExecutionAssets = async (
+  executionId: string,
+  userEmail: string
+) => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/api/workflow-execution/${executionId}/assets`,
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener assets de ejecución:", error);
+    throw new Error("Hubo un error al obtener los assets de la ejecución");
+  }
+};
+
+export const getWorkflowExecutions = async (userEmail: string) => {
+  try {
+    const response = await axios.get(`${API_URL}/api/workflow-executions`, {
+      headers: { "x-user-email": userEmail },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener ejecuciones:", error);
+    throw new Error("Hubo un error al obtener las ejecuciones");
+  }
+};
+
+// Legacy functions for backward compatibility
 export const sendFilesInitialDemand = async (formData: FormData) => {
   try {
     const response = await axios.post(`${API_URL}/api/upload-files`, formData);
     return response.data;
   } catch (error) {
     console.error("Error al generar resumen de la sentencia:", error);
-  throw new Error("Hubo un error al generar el resumen de la sentencia");
+    throw new Error("Hubo un error al generar el resumen de la sentencia");
   }
 };
+
 export const sendFilesSecondFormat = async (formData: FormData) => {
   try {
     const response = await axios.post(
