@@ -26,9 +26,9 @@ export const WorkflowForm = () => {
       <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <button
           className="bg-blue-500 text-white rounded-md p-2"
-          onClick={() => setIsOpen(true)}
+          onClick={() => setIsOpen(!isOpen)}
         >
-          Create Workflow
+          {isOpen ? "Close" : "Create Workflow"}
         </button>
       </div>
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>

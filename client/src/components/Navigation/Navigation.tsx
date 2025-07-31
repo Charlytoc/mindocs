@@ -1,8 +1,10 @@
+import { useNavigate } from "react-router";
 import { useAuthStore } from "../../infrastructure/store";
 import { Auth } from "../Auth/Auth";
 
 export const Navigation = () => {
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
@@ -17,7 +19,12 @@ export const Navigation = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
-              <h1 className="text-xl font-bold text-gray-800">
+              <h1
+                onClick={() => {
+                  navigate("/");
+                }}
+                className="text-xl font-bold text-gray-800"
+              >
                 DocuFácil
               </h1>
             </div>

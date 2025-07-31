@@ -8,6 +8,8 @@ import {
 import { useAuthStore } from "../../../infrastructure/store";
 import { Waiter } from "../../../components/Waiter/Waiter";
 import { AssetList } from "../../../components/Assets";
+import { Modal } from "../../../components/Modal/Modal";
+import { rerunWorkflowExecution } from "../../../utils/api";
 
 type Asset = {
   id: string;
@@ -23,9 +25,17 @@ type WorkflowExecution = {
   id: string;
   workflow: { id: string; name: string };
   status: string;
+  log: string;
   created_at: string;
   started_at: string;
   finished_at: string;
+  messages: Message[];
+};
+
+type Message = {
+  id: string;
+  role: string;
+  content: string;
 };
 
 export const WorkflowExecutionDetail = () => {
@@ -95,69 +105,68 @@ export const WorkflowExecutionDetail = () => {
     }
   };
 
+  console.log(execution, "EXECUTION");
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-200/50 mb-6">
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-          </div>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
             {execution?.workflow.name}
           </h1>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-4 mb-6">
+              {execution?.finished_at && (
+                <span className="text-sm text-gray-500 font-medium">
+                  Terminado el{" "}
+                  {new Date(execution.finished_at).toLocaleString()}
+                </span>
+              )}
+              <span
+                className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold shadow-lg ${getStatusColor(
+                  execution?.status || ""
+                )}`}
+              >
+                {execution?.status}
+              </span>
+              <button
+                className="border border-gray-300 rounded-full px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                onClick={async () => {
+                  await rerunWorkflowExecution(
+                    execution_id || "",
+                    user?.email || ""
+                  );
+                  fetchExecution();
+                }}
+              >
+                🔄
+              </button>
+            </div>
 
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <span className="text-sm text-gray-500 font-medium">
-              ID: #{execution_id}
-            </span>
-            <span
-              className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold shadow-lg ${getStatusColor(
-                execution?.status || ""
-              )}`}
-            >
-              {execution?.status}
-            </span>
+            {/* Progress indicator for in-progress workflows */}
           </div>
-
-          {/* Progress indicator for in-progress workflows */}
-          {execution &&
-            (execution.status === "IN_PROGRESS" ||
-              execution.status === "PENDING") && (
-              <div className="mt-6 p-4 bg-white rounded-2xl shadow-lg border border-gray-200/60">
-                <Waiter
-                  executionId={execution_id || ""}
-                  onFinish={fetchExecution}
-                />
-              </div>
-            )}
         </div>
+        {execution &&
+          (execution.status === "IN_PROGRESS" ||
+            execution.status === "PENDING") && (
+            <div className="mt-6 p-4 bg-white rounded-2xl shadow-lg border border-gray-200/60">
+              <Waiter
+                executionId={execution_id || ""}
+                onFinish={fetchExecution}
+              />
+            </div>
+          )}
 
-        {/* Assets Grid */}
         {execution?.status === "DONE" && (
           <div className="space-y-8">
             {/* Section Title */}
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Documentos del Workflow
-              </h2>
-              <p className="text-gray-600">
-                Archivos subidos y documentos generados por el proceso
-              </p>
-            </div>
+            <p className="text-gray-600">
+              Archivos subidos y documentos generados por el proceso
+            </p>
+            {/* <LogInspector log={execution?.log || ""} /> */}
+            {/* <MessagesList messages={execution?.messages || []} /> */}
 
             {/* Assets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -166,6 +175,37 @@ export const WorkflowExecutionDetail = () => {
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+const LogInspector = ({ log }: { log: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>Ver Log</button>
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+        <div className="p-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
+            Log del Workflow
+          </h2>
+          <pre className="text-sm text-gray-600 whitespace-pre-wrap break-words">
+            {log}
+          </pre>
+        </div>
+      </Modal>
+    </>
+  );
+};
+
+const MessagesList = ({ messages }: { messages: Message[] }) => {
+  return (
+    <div>
+      {messages.map((m) => (
+        <div key={m.id}>
+          <span className="font-bold">{m.role}:</span> {m.content}
+        </div>
+      ))}
     </div>
   );
 };

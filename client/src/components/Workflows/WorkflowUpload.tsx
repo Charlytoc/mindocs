@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { startWorkflow } from "../../utils/api";
 import { useAuthStore } from "../../infrastructure/store";
 import { FileInput } from "../Files/FileInput";
+import { VoiceInput } from "../Files/VoiceInput";
 import toast from "react-hot-toast";
 
 interface Workflow {
@@ -12,17 +13,22 @@ interface Workflow {
 
 interface WorkflowUploadProps {
   workflow: Workflow;
+  // fetchWorkflow: () => void;
   onUploadSuccess: ({ execution_id }: { execution_id: string }) => void;
   onBack: () => void;
 }
 
 export const WorkflowUpload = ({
   workflow,
+  // fetchWorkflow,
   onUploadSuccess,
   onBack,
 }: WorkflowUploadProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [descriptions, setDescriptions] = useState<string[]>([]);
+  const [audioRecordings, setAudioRecordings] = useState<
+    { blob: Blob; name: string; description: string }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const inputTextRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuthStore();
@@ -47,6 +53,34 @@ export const WorkflowUpload = ({
     setDescriptions(newDescriptions);
   };
 
+  const handleAudioRecorded = (audioBlob: Blob, audioUrl: string) => {
+    // Generate a unique filename with timestamp and random hash
+    const timestamp = Date.now();
+    const randomHash = Math.random().toString(36).substring(2, 15);
+    const fileName = `audio_recording_${timestamp}_${randomHash}.webm`;
+
+    setAudioRecordings((prev) => [
+      ...prev,
+      {
+        blob: audioBlob,
+        name: fileName,
+        description: "",
+      },
+    ]);
+  };
+
+  const handleAudioDescriptionChange = (index: number, value: string) => {
+    setAudioRecordings((prev) => {
+      const newRecordings = [...prev];
+      newRecordings[index] = { ...newRecordings[index], description: value };
+      return newRecordings;
+    });
+  };
+
+  const removeAudioRecording = (index: number) => {
+    setAudioRecordings((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -55,18 +89,31 @@ export const WorkflowUpload = ({
       return;
     }
 
-    if (files.length === 0) {
-      toast.error("Debes seleccionar al menos un archivo");
+    if (files.length === 0 && audioRecordings.length === 0) {
+      toast.error("Debes seleccionar al menos un archivo o grabar audio");
       return;
     }
 
     setIsLoading(true);
 
     try {
+      // Convert audio recordings to files and combine with regular files
+      const allFiles = [...files];
+      const allDescriptions = [...descriptions];
+
+      // Add audio recordings as files
+      audioRecordings.forEach((recording) => {
+        const audioFile = new File([recording.blob], recording.name, {
+          type: "audio/webm",
+        });
+        allFiles.push(audioFile);
+        allDescriptions.push(recording.description);
+      });
+
       const response = await startWorkflow(
         workflow.id,
-        files,
-        descriptions,
+        allFiles,
+        allDescriptions,
         user.email,
         inputTextRef.current?.value
       );
@@ -86,6 +133,7 @@ export const WorkflowUpload = ({
   const handleClear = () => {
     setFiles([]);
     setDescriptions([]);
+    setAudioRecordings([]);
   };
 
   return (
@@ -119,6 +167,14 @@ export const WorkflowUpload = ({
           />
         </div>
 
+        {/* Audio Recording Section */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Grabación de Audio (Opcional)
+          </label>
+          <VoiceInput onAudioRecorded={handleAudioRecorded} />
+        </div>
+
         {/* File descriptions */}
         {files.length > 0 && (
           <div className="space-y-4">
@@ -144,6 +200,48 @@ export const WorkflowUpload = ({
           </div>
         )}
 
+        {/* Audio Recordings */}
+        {audioRecordings.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Grabaciones de Audio
+            </h3>
+            {audioRecordings.map((recording, index) => (
+              <div
+                key={index}
+                className="space-y-2 p-4 border border-gray-200 rounded-lg bg-gray-50"
+              >
+                <div className="flex justify-between items-center">
+                  <label className="block text-sm font-medium text-gray-700">
+                    🎤 {recording.name}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeAudioRecording(index)}
+                    className="text-red-600 hover:text-red-800 text-sm"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
+                <audio
+                  controls
+                  src={URL.createObjectURL(recording.blob)}
+                  className="w-full"
+                />
+                <textarea
+                  value={recording.description}
+                  onChange={(e) =>
+                    handleAudioDescriptionChange(index, e.target.value)
+                  }
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Descripción opcional de la grabación..."
+                  rows={2}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex justify-between pt-6">
           <button
@@ -155,7 +253,9 @@ export const WorkflowUpload = ({
           </button>
           <button
             type="submit"
-            disabled={isLoading || files.length === 0}
+            disabled={
+              isLoading || (files.length === 0 && audioRecordings.length === 0)
+            }
             className="py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
           >
             {isLoading ? "Enviando archivos..." : "Iniciar Workflow"}

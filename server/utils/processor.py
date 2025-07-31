@@ -2,6 +2,7 @@ from datetime import datetime
 from server.utils.printer import Printer
 from server.utils.pdf_reader import DocumentReader
 from server.utils.image_reader import ImageReader
+from server.utils.audio_reader import AudioReader
 
 from server.db import session_context_sync
 from server.models import (
@@ -20,6 +21,8 @@ import json
 from server.utils.redis_cache import redis_client
 
 printer = Printer("PROCESSOR")
+
+audio_reader = AudioReader(model_name="base", include_timestamps=False)
 
 
 def send_message_to_user(message: str, workflow_execution_id: str):
@@ -46,25 +49,20 @@ def process_workflow_execution(workflow_execution_id: str):
             .first()
         )
         if not w:
-            printer.error(
-                f"No se encontró la ejecución de workflow {workflow_execution_id}"
-            )
+            printer.error(f"No se encontró la ejecución #{workflow_execution_id}")
             return
+
+        log = w.generation_log
+        if not log:
+            log = f"<workflow_execution>{workflow_execution_id}</workflow_execution>"
+            w.generation_log = log
+            session.commit()
+
         assets = w.assets
 
-        print(w.workflow.instructions, "INSTRUCTIONS")
+        log += f"<instructions>{w.workflow.instructions}</instructions>"
+        printer.info(log)
 
-        # redis_client.publish(
-        #     "workflow_updates",
-        #     json.dumps(
-        #         {
-        #             "workflow_execution_id": workflow_execution_id,
-        #             "log": f"Instrucciones del workflow: {w.workflow.instructions}",
-        #             "status": "PROCESSING",
-        #             "assets_ready": False,
-        #         }
-        #     ),
-        # )
         w.status = WorkflowExecutionStatus.IN_PROGRESS
         w.started_at = datetime.now()
         session.commit()
@@ -73,6 +71,9 @@ def process_workflow_execution(workflow_execution_id: str):
         image_reader = ImageReader()
 
         for asset in assets:
+            if asset.status == AssetStatus.DONE:
+                continue
+            log += f"<asset>{asset.name}</asset>"
             if asset.asset_type == AssetType.FILE:
                 file_extension = os.path.splitext(asset.name)[1]
                 file_path = (
@@ -83,19 +84,52 @@ def process_workflow_execution(workflow_execution_id: str):
                 printer.info(f"Procesando archivo {asset.name}")
                 if ext in [".pdf", ".docx"]:
                     extracted_text = document_reader.read(file_path)
+                    log += (
+                        f"<document_extraction>{extracted_text}</document_extraction>"
+                    )
                 elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
                     extracted_text = image_reader.read(
                         file_path,
                         f"Nombre del archivo adjunto: {asset.name}. Se está realizando un flujo de trabajo que requiere de la información de la imagen. Las instrucciones del flujo de trabajo son: {w.workflow.instructions}. Extraer la información que pueda ser útil para el flujo de trabajo.",
                     )
+                    log += f"<image_extraction>{extracted_text}</image_extraction>"
                 elif ext in [".txt", ".xml", ".html", ".md", ".json", ".csv"]:
                     with open(file_path, "r", encoding="utf-8") as f:
                         extracted_text = f.read()
+                    log += f"<text_extraction>{extracted_text}</text_extraction>"
+                elif ext in [".mp3", ".wav", ".m4a", ".webm"]:
+                    redis_client.publish(
+                        "workflow_updates",
+                        json.dumps(
+                            {
+                                "workflow_execution_id": workflow_execution_id,
+                                "log": f"El agente IA está transcribiendo el audio {asset.name}.",
+                                "status": "PROCESSING",
+                                "assets_ready": False,
+                            }
+                        ),
+                    )
+                    extracted_text = audio_reader.read(file_path)
+                    log += (
+                        f"<audio_transcription>{extracted_text}</audio_transcription>"
+                    )
+                    redis_client.publish(
+                        "workflow_updates",
+                        json.dumps(
+                            {
+                                "workflow_execution_id": workflow_execution_id,
+                                "log": f"Se extrajo el texto de **{asset.name}**.",
+                                "status": "PROCESSING",
+                                "assets_ready": False,
+                            }
+                        ),
+                    )
+
                 asset.extracted_text = extracted_text
                 asset.content = extracted_text
                 asset.status = AssetStatus.DONE
+                w.generation_log = log
                 session.commit()
-                printer.yellow(extracted_text, "EXTRACTED TEXT")
                 redis_client.publish(
                     "workflow_updates",
                     json.dumps(
@@ -120,7 +154,7 @@ def process_workflow_execution(workflow_execution_id: str):
 
         assets_text = "\n".join(
             [
-                f"```{asset.name}\n{asset.content}```"
+                f"```{asset.name}\n{asset.content}\n\n> ASSET DESCRIPTION: {asset.brief or 'No description'}```"
                 for asset in assets
                 if asset.content
             ]
@@ -129,23 +163,31 @@ def process_workflow_execution(workflow_execution_id: str):
         messages = [
             {
                 "role": "system",
-                "content": f"You are a helpful agent that can execute workflows. For the current workflow, these are the instructions provided by the user: {w.workflow.instructions}. The goals is to use the available tools to execute the workflow. Interact with the user to let him know the progress of the workflow. Stop calling tools when the workflow is completed. You will receive the text of the uploaded files, and you will have to use the tools to craft new files based on the requirements. The new files will be in markdown format. ",
+                "content": f"You are a helpful agent that can execute workflows over files. For the current workflow, these are the instructions provided by the user: ```{w.workflow.instructions}```. The goal is to use the available tools until the workflow is completed. Interact with the user to let him know the progress of the workflow. Stop calling tools ONLY when the workflow is completed, if you don't call tools, your loop will stop and you can maybe not finish the workflow. You will receive the text of the uploaded files, and you will have to use the tools to craft new files based on the requirements. The new files will be in markdown format. Don't stop until all necessary assets are created. Keep in mind that you cannot interact with the user directly, you can only use the tools to interact with the user. You need to work only with the information available at the moment. The user will see the result later.",
             },
             {
                 "role": "user",
-                "content": f"The workflow is: {w.workflow.name}. The assets are: {assets_text}",
+                "content": f"The workflow is: {w.workflow.name}. The assets on this execution are: {assets_text}",
             },
         ]
 
         def emit_message(message):
-            printer.yellow(message, "EMIT MESSAGE")
             send_message_to_user(message, str(workflow_execution_id))
-            message = Message(
+            m = Message(
                 workflow_execution_id=workflow_execution_id,
-                role="user",
+                role="assistant",
                 content=message,
             )
-            session.add(message)
+            w.generation_log += f"\n<ai_message>{message}</ai_message>"
+            session.add(m)
+            session.commit()
+
+        def annotate_in_scratchpad(message: str):
+            """
+            This function is used to annotate the scratchpad.
+            The scratchpad is a list of messages that the agent can use to remember things.
+            """
+            w.generation_log += f"\n<scratchpad>{message}</scratchpad>"
             session.commit()
 
         def create_new_asset(name: str, content: str):
@@ -161,8 +203,7 @@ def process_workflow_execution(workflow_execution_id: str):
             )
             session.add(asset)
 
-            session.commit()
-            printer.yellow(f"Se creó el asset {name}.", "NEW ASSET")
+            w.generation_log += f"\n<ai_message>Se creó el asset **{name}**. Con contenido:```markdown\n{content}\n```</ai_message>"
             redis_client.publish(
                 "workflow_updates",
                 json.dumps(
@@ -174,17 +215,20 @@ def process_workflow_execution(workflow_execution_id: str):
                     }
                 ),
             )
+            session.commit()
 
         ai.agent_loop(
             messages,
             model=os.getenv("MODEL", "gemma3"),
             tools=[
-                function_to_openai_schema(emit_message),
+                # function_to_openai_schema(emit_message),
                 function_to_openai_schema(create_new_asset),
+                function_to_openai_schema(annotate_in_scratchpad),
             ],
             tools_fn_map={
                 "emit_message": emit_message,
                 "create_new_asset": create_new_asset,
+                "annotate_in_scratchpad": annotate_in_scratchpad,
             },
             on_message=on_message,
         )

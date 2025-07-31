@@ -19,7 +19,7 @@ async def redis_to_socketio_bridge():
 
     try:
         async for message in pubsub.listen():
-            printer.green("Message received: ", message)
+            # printer.green("Message received: ", message)
             if message["type"] == "message":
                 # printer.green("Message received")
                 data = json.loads(message["data"])

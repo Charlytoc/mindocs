@@ -115,6 +115,8 @@ class WorkflowExecution(Base):
     summary = Column(Text, nullable=True)
     status_message = Column(Text, nullable=True)
 
+    generation_log = Column(Text, nullable=True)
+
     workflow = relationship("Workflow", back_populates="workflow_executions")
 
     # Assets concretos de esta ejecución (no ejemplos)

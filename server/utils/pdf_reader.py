@@ -23,6 +23,23 @@ PAGE_CONNECTOR = "\n---PAGE---\n"
 printer = Printer("PDF_READER")
 
 
+tesseract_cmd = os.getenv("TESSERACT_CMD")
+if tesseract_cmd:
+    print("🔍 Usando tesseract_cmd:", tesseract_cmd)
+
+    # Si es Windows, aseguramos que termina en tesseract.exe
+    if os.name == "nt":
+        if os.path.isdir(tesseract_cmd):
+            tesseract_cmd = os.path.join(tesseract_cmd, "tesseract.exe")
+
+        if not os.path.isfile(tesseract_cmd):
+            raise FileNotFoundError(
+                f"El ejecutable de tesseract no se encontró en: {tesseract_cmd}"
+            )
+
+    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+
 class DocumentStrategy(ABC):
     document_hash: str | None = None
 

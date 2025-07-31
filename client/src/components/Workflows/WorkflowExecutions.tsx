@@ -1,8 +1,12 @@
+import toast from "react-hot-toast";
+import { useAuthStore } from "../../infrastructure/store";
 import { WorkflowExecution } from "../../routes/Workflow/page";
+import { deleteWorkflowExecution } from "../../utils/api";
 
 interface WorkflowExecutionsProps {
   executions: WorkflowExecution[];
   onExecutionClick: (executionId: string) => void;
+  fetchWorkflow: () => void;
 }
 
 const getStatusColor = (status: string) => {
@@ -48,7 +52,9 @@ const formatDate = (dateString: string) => {
 export const WorkflowExecutions = ({
   executions,
   onExecutionClick,
+  fetchWorkflow,
 }: WorkflowExecutionsProps) => {
+  const { user } = useAuthStore();
   if (executions.length === 0) {
     return (
       <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
@@ -62,6 +68,19 @@ export const WorkflowExecutions = ({
     );
   }
 
+  const handleDelete = async (executionId: string) => {
+    const toastId = toast.loading("Eliminando ejecución...");
+    if (!user) {
+      toast.error("Debes iniciar sesión para eliminar ejecuciones", {
+        id: toastId,
+      });
+      return;
+    }
+    await deleteWorkflowExecution(executionId, user.email);
+    toast.success("Ejecución eliminada correctamente", { id: toastId });
+    fetchWorkflow();
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">
@@ -72,7 +91,6 @@ export const WorkflowExecutions = ({
           <div
             key={execution.id}
             className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => onExecutionClick(execution.id)}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-3">
@@ -80,9 +98,16 @@ export const WorkflowExecutions = ({
                   className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
                     execution.status
                   )}`}
+                  onClick={() => onExecutionClick(execution.id)}
                 >
                   {getStatusText(execution.status)}
                 </span>
+                <button
+                  className="text-red-500 hover:text-red-700"
+                  onClick={() => handleDelete(execution.id)}
+                >
+                  Eliminar
+                </button>
                 {execution.delivered && (
                   <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
                     Entregado

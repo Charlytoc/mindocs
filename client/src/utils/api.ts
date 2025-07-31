@@ -346,3 +346,75 @@ export const approveCase = async (caseId: string) => {
     throw new Error("Hubo un error al aprobar el caso");
   }
 };
+
+export const deleteWorkflowExecution = async (
+  executionId: string,
+  userEmail: string
+) => {
+  try {
+    const response = await axios.delete(
+      `${API_URL}/api/workflow-execution/${executionId}`,
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al eliminar la ejecución:", error);
+    throw new Error("Hubo un error al eliminar la ejecución");
+  }
+};
+
+export const rerunWorkflowExecution = async (
+  executionId: string,
+  userEmail: string
+) => {
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/workflow-execution/${executionId}/rerun`,
+      {},
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al re-ejecutar la ejecución:", error);
+    throw new Error("Hubo un error al re-ejecutar la ejecución");
+  }
+};
+
+export const convertAsset = async (
+  assetId: string,
+  userEmail: string,
+  exportType: string
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("export_type", exportType);
+
+    const response = await axios.post(
+      `${API_URL}/api/convert/asset/${assetId}`,
+      formData,
+      {
+        headers: {
+          "x-user-email": userEmail,
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al convertir el asset:", error);
+    throw new Error("Hubo un error al convertir el asset");
+  }
+};
+
+export const getSupportedExportTypes = async () => {
+  try {
+    const response = await axios.get(`${API_URL}/api/convert/supported-types`);
+    return response.data;
+  } catch (error) {
+    console.error("Error al obtener tipos de exportación:", error);
+    throw new Error("Hubo un error al obtener los tipos de exportación");
+  }
+};
