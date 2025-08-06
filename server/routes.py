@@ -194,8 +194,8 @@ async def create_workflow(
     name: str = Form(...),
     description: str = Form(...),
     instructions: str = Form(...),
-    output_examples: List[UploadFile] = File(None),
-    output_examples_description: List[str] = Form(...),
+    output_examples: Optional[List[UploadFile]] = File(None),
+    output_examples_description: Optional[List[str]] = Form(None),
     session: AsyncSession = Depends(get_session),
     x_user_email: str = Header(...),
 ):
