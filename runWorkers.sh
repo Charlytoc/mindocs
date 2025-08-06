@@ -1,5 +1,31 @@
 #!/bin/bash
 
+LOAD_ENV=false
+
+# Procesar argumentos para --load-env/-le y concurrencia
+CONCURRENCY=""
+ARGS=()
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        --load-env|-le)
+            LOAD_ENV=true
+            ;;
+        -c|--concurrency)
+            if [[ -n "$2" && "$2" != -* ]]; then
+                CONCURRENCY="$2"
+                shift
+            else
+                echo "❌ Se esperaba un valor para $1 (ej: 4)"
+                exit 1
+            fi
+            ;;
+        *)
+            ARGS+=("$1")
+            ;;
+    esac
+    shift
+done
+
 # Verificar si existe el entorno virtual
 if [ ! -d "venv" ]; then
     echo "❌ No se encontró el directorio 'venv'."
@@ -10,7 +36,6 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
-# Activar el entorno virtual
 # Activar el entorno virtual según el sistema operativo
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OS" == "Windows_NT" ]]; then
     ACTIVATE_SCRIPT="venv\\Scripts\\activate"
@@ -39,16 +64,20 @@ fi
 echo "📦 Instalando dependencias desde $REQUIREMENTS_FILE..."
 pip install -r "$REQUIREMENTS_FILE"
 
-# Cargar variables del .env si existe
+# Cargar variables del .env solo si se pidió explícitamente
 ENV_FILE=".env"
-if [ -f "$ENV_FILE" ]; then
-    echo "📄 Cargando variables desde .env..."
-    set -o allexport
-    source "$ENV_FILE"
-    set +o allexport
+if $LOAD_ENV; then
+    if [ -f "$ENV_FILE" ]; then
+        echo "📄 Cargando variables desde .env..."
+        set -o allexport
+        source "$ENV_FILE"
+        set +o allexport
+    else
+        echo "⚠️  No se encontró archivo .env para cargar variables."
+    fi
 fi
 
-# Preguntar si no existen las variables necesarias
+# Función para preguntar si no existen las variables necesarias
 ask_if_missing() {
     VAR_NAME=$1
     DEFAULT=$2
@@ -76,27 +105,6 @@ ask_if_missing "REDIS_HOST" "localhost"
 ask_if_missing "REDIS_PORT" "6379"
 ask_if_missing "REDIS_DB" "0"
 
-# Obtener concurrencia desde argumento o preguntar
-CONCURRENCY=""
-while [[ "$#" -gt 0 ]]; do
-    case "$1" in
-        -c|--concurrency)
-            if [[ -n "$2" && "$2" != -* ]]; then
-                CONCURRENCY="$2"
-                shift
-            else
-                echo "❌ Se esperaba un valor para $1 (ej: 4)"
-                exit 1
-            fi
-            ;;
-        *)
-            echo "❌ Argumento desconocido: $1"
-            exit 1
-            ;;
-    esac
-    shift
-done
-
 if [ -z "$CONCURRENCY" ]; then
     echo "🔢 ¿Cuántos procesos de concurrencia desea para Celery? (default: 4)"
     read CONCURRENCY
@@ -108,6 +116,4 @@ fi
 BROKER_URL="redis://${REDIS_HOST}:${REDIS_PORT}/${REDIS_DB}"
 echo "🚀 Iniciando Celery worker con broker: $BROKER_URL"
 
-
 celery -A server.celery_app worker --loglevel=info --concurrency=$CONCURRENCY -E -n "worker@%h"
-

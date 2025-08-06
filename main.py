@@ -102,37 +102,6 @@ async def auth_and_cors(request: Request, call_next):
                 status_code=403, content={"detail": f"IP '{client_ip}' no permitida."}
             )
 
-    # CHECK_AUTH = ENVIRONMENT == "prod"
-    # CHECK_AUTH = False
-    # if CHECK_AUTH:
-    #     auth: str = request.headers.get("Authorization", "")
-    #     if not auth.startswith("Bearer "):
-    #         printer.yellow("No se encontró el token en el header")
-    #         return JSONResponse(
-    #             status_code=401,
-    #             content={"detail": "Missing or malformed Authorization header."},
-    #         )
-    #     token = auth.split(" ", 1)[1]
-
-    #     validate_url = os.getenv(
-    #         "TOKEN_VALIDATION_URL",
-    #         "https://declaraciones.pjedomex.gob.mx/declaraciones/gestion",
-    #     )
-
-    #     payload = {"access_token": token}
-    #     printer.yellow(f"Validando token en {validate_url}...", payload)
-    #     async with httpx.AsyncClient(timeout=5) as client:
-    #         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    #         body = urlencode(payload)
-    #         resp = await client.post(validate_url, data=body, headers=headers)
-    #         printer.yellow("Respuesta del servidor:", resp.text)
-    #     if resp.status_code != 200:
-    #         printer.error(f"Token inválido o expirado: {resp.text}")
-    #         return JSONResponse(
-    #             status_code=401, content={"detail": "Invalid or expired token."}
-    #         )
-    # else:
-    #     printer.yellow("No se validó el token")
     printer.green("Una solicitud fue permitida con éxito a las ", datetime.now())
     return await call_next(request)
 
