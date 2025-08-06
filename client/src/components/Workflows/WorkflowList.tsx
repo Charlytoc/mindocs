@@ -93,6 +93,7 @@ export const WorkflowList = ({ onSelectWorkflow }: WorkflowListProps) => {
             empezar.
           </p>
         </div>
+        <WorkflowForm />
       </div>
     );
   }

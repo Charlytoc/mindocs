@@ -89,7 +89,7 @@ export const WorkflowForm = () => {
           className="bg-blue-500 text-white rounded-md p-2"
           onClick={() => setIsOpen(!isOpen)}
         >
-          {isOpen ? "Cerrar" : "Crear otro flujo de trabajo"}
+          {isOpen ? "Cerrar" : "Crear nuevo flujo de trabajo"}
         </button>
       </div>
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
