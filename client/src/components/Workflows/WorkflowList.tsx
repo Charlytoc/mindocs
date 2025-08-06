@@ -68,7 +68,8 @@ export const WorkflowList = ({ onSelectWorkflow }: WorkflowListProps) => {
 
   if (workflows.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4">
+        <WorkflowForm />
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
           <div className="text-gray-400 mb-4">
             <svg
@@ -93,7 +94,6 @@ export const WorkflowList = ({ onSelectWorkflow }: WorkflowListProps) => {
             empezar.
           </p>
         </div>
-        <WorkflowForm />
       </div>
     );
   }

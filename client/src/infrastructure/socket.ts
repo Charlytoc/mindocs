@@ -1,5 +1,5 @@
 import { io, Socket } from "socket.io-client";
-const DEV_MODE = true;
+import { DEV_MODE } from "../utils/api";
 
 class SocketClient {
   private socket: Socket;
