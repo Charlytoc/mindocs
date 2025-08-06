@@ -15,6 +15,8 @@ export const signup = async (
     formData.append("password", password);
     if (name) formData.append("name", name);
 
+    console.log(API_URL, "URL of API");
+
     const response = await axios.post(`${API_URL}/api/signup`, formData);
     return response.data;
   } catch (error) {
