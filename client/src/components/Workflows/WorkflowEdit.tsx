@@ -43,7 +43,7 @@ export const WorkflowEdit = ({
     setIsLoading(true);
 
     try {
-      const response = await updateWorkflow(
+      await updateWorkflow(
         workflow.id,
         name.trim(),
         description.trim(),

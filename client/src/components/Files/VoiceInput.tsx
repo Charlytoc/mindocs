@@ -148,14 +148,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     }
   };
 
-  const clearRecording = () => {
-    setRecordedAudio(null);
-    setRecordingTime(0);
-    if (recordedAudio) {
-      URL.revokeObjectURL(recordedAudio);
-    }
-  };
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -219,6 +211,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         {!isRecording ? (
           <button
             className="border border-gray-300 rounded-full px-4 py-2 hover:bg-gray-100 cursor-pointer"
+            type="button"
             onClick={startRecording}
             disabled={disabled || audioDevices.length === 0}
           >
@@ -226,6 +219,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           </button>
         ) : (
           <button
+            type="button"
             onClick={stopRecording}
             style={{
               backgroundColor: "#dc3545",

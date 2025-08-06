@@ -97,9 +97,7 @@ export const WorkflowDetail = () => {
                 </div>
               </div>
 
-              {/* Formulario de upload */}
               <WorkflowUpload
-                // fetchWorkflow={fetchWorkflow}
                 workflow={{
                   id: id || "",
                   name: workflow?.name || "",
@@ -108,7 +106,6 @@ export const WorkflowDetail = () => {
                 onUploadSuccess={({ execution_id }) => {
                   navigate(`/workflow/${id}/execution/${execution_id}`);
                 }}
-                onBack={() => {}}
               />
 
               {/* Mostrar ejecuciones recientes */}

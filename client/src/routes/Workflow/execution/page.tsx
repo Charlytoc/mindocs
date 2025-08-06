@@ -8,7 +8,6 @@ import {
 import { useAuthStore } from "../../../infrastructure/store";
 import { Waiter } from "../../../components/Waiter/Waiter";
 import { AssetList } from "../../../components/Assets";
-import { Modal } from "../../../components/Modal/Modal";
 import { rerunWorkflowExecution } from "../../../utils/api";
 
 type Asset = {
@@ -39,7 +38,7 @@ type Message = {
 };
 
 export const WorkflowExecutionDetail = () => {
-  const { id, execution_id } = useParams();
+  const { execution_id } = useParams();
   const { user } = useAuthStore();
 
   const [uploadedAssets, setUploadedAssets] = useState<Asset[]>([]);
@@ -105,8 +104,6 @@ export const WorkflowExecutionDetail = () => {
     }
   };
 
-  console.log(execution, "EXECUTION");
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50/50">
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -170,7 +167,7 @@ export const WorkflowExecutionDetail = () => {
 
             {/* Assets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <AssetList assets={allAssets} />
+              <AssetList assets={allAssets} refetchAssets={fetchAssets} />
             </div>
           </div>
         )}
@@ -179,33 +176,33 @@ export const WorkflowExecutionDetail = () => {
   );
 };
 
-const LogInspector = ({ log }: { log: string }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <>
-      <button onClick={() => setIsOpen(true)}>Ver Log</button>
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <div className="p-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-2">
-            Log del Workflow
-          </h2>
-          <pre className="text-sm text-gray-600 whitespace-pre-wrap break-words">
-            {log}
-          </pre>
-        </div>
-      </Modal>
-    </>
-  );
-};
+// const LogInspector = ({ log }: { log: string }) => {
+//   const [isOpen, setIsOpen] = useState(false);
+//   return (
+//     <>
+//       <button onClick={() => setIsOpen(true)}>Ver Log</button>
+//       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+//         <div className="p-4">
+//           <h2 className="text-lg font-bold text-gray-900 mb-2">
+//             Log del Workflow
+//           </h2>
+//           <pre className="text-sm text-gray-600 whitespace-pre-wrap break-words">
+//             {log}
+//           </pre>
+//         </div>
+//       </Modal>
+//     </>
+//   );
+// };
 
-const MessagesList = ({ messages }: { messages: Message[] }) => {
-  return (
-    <div>
-      {messages.map((m) => (
-        <div key={m.id}>
-          <span className="font-bold">{m.role}:</span> {m.content}
-        </div>
-      ))}
-    </div>
-  );
-};
+// const MessagesList = ({ messages }: { messages: Message[] }) => {
+//   return (
+//     <div>
+//       {messages.map((m) => (
+//         <div key={m.id}>
+//           <span className="font-bold">{m.role}:</span> {m.content}
+//         </div>
+//       ))}
+//     </div>
+//   );
+// };

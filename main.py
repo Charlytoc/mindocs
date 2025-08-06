@@ -14,7 +14,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from server.utils.printer import Printer
 from server.routes import router
 from server.managers.socket_server import sio
-from server.managers.notifications import redis_to_socketio_bridge
+from server.managers.notifications import (
+    redis_to_socketio_bridge,
+    redis_to_socketio_bridge_notifications,
+)
 
 printer = Printer("MAIN")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "prod").lower().strip()
@@ -30,10 +33,14 @@ os.makedirs("uploads/documents/read", exist_ok=True)
 async def lifespan(app: FastAPI):
     printer.green("Iniciando aplicación, hora: ", datetime.now())
     task = asyncio.create_task(redis_to_socketio_bridge())
+    task_notifications = asyncio.create_task(redis_to_socketio_bridge_notifications())
     yield
     task.cancel()
+    task_notifications.cancel()
+
     try:
         await task
+        await task_notifications
     except asyncio.CancelledError:
         pass
 

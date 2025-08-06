@@ -1,13 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Markdowner } from "../Markdowner/Markdowner";
 import { Modal } from "../Modal/Modal";
 import {
   API_URL,
   convertAsset,
   getSupportedExportTypes,
+  requestChanges,
 } from "../../utils/api";
 import { useAuthStore } from "../../infrastructure/store";
 import { toast } from "react-hot-toast";
+import { generateUniqueID } from "../../utils/lib";
+
+import socket from "../../infrastructure/socket";
 
 type Asset = {
   id: string;
@@ -33,9 +37,10 @@ type ExportCategory = {
 
 interface AssetCardProps {
   asset: Asset;
+  refetchAssets: () => void;
 }
 
-export const AssetCard = ({ asset }: AssetCardProps) => {
+export const AssetCard = ({ asset, refetchAssets }: AssetCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [exportTypes, setExportTypes] = useState<ExportType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -301,130 +306,143 @@ export const AssetCard = ({ asset }: AssetCardProps) => {
 
       {showContent && (
         <Modal isOpen={showContent} onClose={toggleContent}>
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-gray-900">
-              Exportar documento
-            </h3>
-
+          <h3 className="text-xl font-bold text-center text-gray-900">
+            {asset.name}
+          </h3>
+          <div className="flex justify-end gap-2 items-center mb-6">
             {/* Modern Dropdown */}
-            <div className="relative dropdown-container">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsDropdownOpen(!isDropdownOpen);
-                }}
-                disabled={isLoading}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg ${
-                  isLoading
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transform hover:scale-105"
-                }`}
-              >
-                {isLoading ? (
-                  <>
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
+            <div>
+              <div className="relative dropdown-container">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDropdownOpen(!isDropdownOpen);
+                  }}
+                  disabled={isLoading}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg ${
+                    isLoading
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:shadow-xl transform "
+                  }`}
+                >
+                  {isLoading ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
                         stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Exportar como...
-                    <svg
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        isDropdownOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </>
-                )}
-              </button>
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      Exportar como...
+                      <svg
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isDropdownOpen ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </>
+                  )}
+                </button>
 
-              {/* Dropdown Menu */}
-              {isDropdownOpen && !isLoading && (
-                <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200/60 z-50 overflow-hidden max-h-96 overflow-y-auto">
-                  <div className="p-3">
-                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 bg-gray-50 rounded-lg mb-3">
-                      Formatos disponibles
-                    </div>
-                    {groupedExportTypes(exportTypes).map((category) => (
-                      <div key={category.name} className="mb-4 last:mb-0">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wider px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg mb-2">
-                          {category.name}
-                        </div>
-                        <div className="space-y-1">
-                          {category.types.map((exportType) => (
-                            <button
-                              key={exportType.type}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleExport(exportType.type);
-                              }}
-                              className="w-full text-left px-3 py-3 rounded-lg hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-all duration-150 group border border-transparent hover:border-blue-200"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                    {exportType.name}
-                                  </div>
-                                  <div className="text-sm text-gray-500 group-hover:text-gray-600 mt-1">
-                                    {exportType.description}
-                                  </div>
-                                </div>
-                                <div className="flex-shrink-0 ml-3">
-                                  <div className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                                    .{exportType.type}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
+                {/* Dropdown Menu */}
+                {isDropdownOpen && !isLoading && (
+                  <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-200/60 z-50 overflow-hidden max-h-96 overflow-y-auto">
+                    <div className="p-3">
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2 bg-gray-50 rounded-lg mb-3">
+                        Formatos disponibles
                       </div>
-                    ))}
+                      {groupedExportTypes(exportTypes).map((category) => (
+                        <div key={category.name} className="mb-4 last:mb-0">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wider px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg mb-2">
+                            {category.name}
+                          </div>
+                          <div className="space-y-1">
+                            {category.types.map((exportType) => (
+                              <button
+                                key={exportType.type}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleExport(exportType.type);
+                                }}
+                                className="w-full text-left px-3 py-3 rounded-lg hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 transition-all duration-150 group border border-transparent hover:border-blue-200"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors flex items-center gap-2">
+                                      <div className="w-2 h-2 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                      {exportType.name}
+                                    </div>
+                                    <div className="text-sm text-gray-500 group-hover:text-gray-600 mt-1">
+                                      {exportType.description}
+                                    </div>
+                                  </div>
+                                  <div className="flex-shrink-0 ml-3">
+                                    <div className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                      .{exportType.type}
+                                    </div>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+
+            <ChangesRequester
+              asset={asset}
+              onFinish={() => {
+                refetchAssets();
+              }}
+            />
+            <div>
+              <button className="bg-red-500 text-white px-4 py-2 rounded-xl">
+                Eliminar
+              </button>
             </div>
           </div>
 
@@ -434,6 +452,97 @@ export const AssetCard = ({ asset }: AssetCardProps) => {
           </div>
         </Modal>
       )}
+    </>
+  );
+};
+
+const ChangesRequester = ({
+  asset,
+  onFinish,
+}: {
+  asset: Asset;
+  onFinish: () => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const { user } = useAuthStore();
+  const [not_id, setNotId] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleRequestChanges = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    e.preventDefault();
+    if (textareaRef.current) {
+      const text = textareaRef.current.value;
+      console.log(text);
+      if (text.length > 0) {
+        const _not_id = generateUniqueID("not_");
+        try {
+          await requestChanges(asset.id, text, user?.email || "", _not_id);
+          setNotId(_not_id);
+          setIsOpen(false);
+        } catch (error) {
+          console.error("Error requesting changes:", error);
+          toast.error("Error al solicitar cambios");
+        }
+      } else {
+        toast.error("Por favor, describe los cambios que deseas realizar");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (not_id) {
+      socket.connect();
+      socket.on(`notification_${not_id}`, (data) => {
+        console.log(data);
+        if (data.status === "DONE") {
+          toast.success("Cambios realizados correctamente");
+          onFinish();
+        }
+      });
+    }
+    return () => {
+      if (not_id) {
+        socket.off(`notification_${not_id}`);
+        socket.disconnect();
+      }
+    };
+  }, [not_id]);
+  return (
+    <>
+      <button
+        className="bg-blue-600 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-blue-700"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        Solicita cambios
+      </button>
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+        <h3 className="text-xl font-bold text-center text-gray-900">
+          Solicita cambios al agente IA
+        </h3>
+        <div>
+          <textarea
+            ref={textareaRef}
+            className="w-full h-48 p-2 border border-gray-300 rounded-xl"
+            placeholder="Describe los cambios que deseas realizar"
+          />
+        </div>
+        <div className="flex justify-end gap-2 items-center mb-6">
+          <button
+            onClick={() => setIsOpen(false)}
+            className="bg-red-500 text-white px-4 py-2 rounded-xl"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleRequestChanges}
+            className="bg-blue-500 text-white px-4 py-2 rounded-xl"
+          >
+            Solicitar cambios
+          </button>
+        </div>
+      </Modal>
     </>
   );
 };

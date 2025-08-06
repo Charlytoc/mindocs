@@ -14,11 +14,13 @@ type Asset = {
 interface AssetListProps {
   assets: Asset[];
   emptyMessage?: string;
+  refetchAssets: () => void;
 }
 
 export const AssetList = ({
   assets,
   emptyMessage = "No hay documentos asociados aún.",
+  refetchAssets,
 }: AssetListProps) => {
   if (assets.length === 0) {
     return (
@@ -51,7 +53,7 @@ export const AssetList = ({
   return (
     <>
       {assets.map((asset) => (
-        <AssetCard key={asset.id} asset={asset} />
+        <AssetCard key={asset.id} asset={asset} refetchAssets={refetchAssets} />
       ))}
     </>
   );

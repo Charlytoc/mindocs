@@ -22,7 +22,7 @@ export const Waiter = ({ executionId, onFinish }: WaiterProps) => {
     "Archivos recibidos",
     "Leyendo archivos",
   ]);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  // const [assets, setAssets] = useState<Asset[]>([]);
   const { user } = useAuthStore();
 
   // // Function to check execution status
@@ -35,7 +35,7 @@ export const Waiter = ({ executionId, onFinish }: WaiterProps) => {
         user.email
       );
       console.log("Execution assets:", assetsData);
-      setAssets(assetsData.uploaded || []);
+      // setAssets(assetsData.uploaded || []);
       // Check if there are generated assets (AI has processed the files)
       // if (assetsData.generated && assetsData.generated.length > 0) {
       //   console.log("Execution is ready, calling onFinish");

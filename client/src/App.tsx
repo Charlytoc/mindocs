@@ -1,20 +1,12 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 // import { Waiter } from "./components/Waiter/Waiter";
 // import { Results } from "./components/Results/Results";
-import { Auth } from "./components/Auth/Auth";
+// import { Auth } from "./components/Auth/Auth";
 import { WorkflowList } from "./components/Workflows/WorkflowList";
-import { WorkflowUpload } from "./components/Workflows/WorkflowUpload";
 import { Navigation } from "./components/Navigation/Navigation";
-import { useAuthStore } from "./infrastructure/store";
 import { useNavigate } from "react-router";
-import { WorkflowForm } from "./components/Workflows/WorkflowForm";
 
-type AppState =
-  | "auth"
-  | "workflow-list"
-  | "workflow-upload"
-  | "processing"
-  | "results";
+
 
 interface Workflow {
   id: string;
@@ -23,7 +15,7 @@ interface Workflow {
 }
 
 function App() {
-  const { isAuthenticated } = useAuthStore();
+  // const { isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,24 +41,12 @@ function App() {
     navigate(`/workflow/${workflow.id}`);
   };
 
-  const handleUploadSuccess = ({ execution_id }: { execution_id: string }) => {
-    navigate(`/workflow/${execution_id}`);
-  };
 
   return (
     <div className="min-h-screen bg-gray-100">
       <Navigation />
       <WorkflowList onSelectWorkflow={handleWorkflowSelect} />
-      <WorkflowForm />
-      {/* <WorkflowUpload
-        workflow={{
-          id: "1",
-          name: "Workflow 1",
-          description: "Workflow 1 description",
-        }}
-        onUploadSuccess={handleUploadSuccess}
-        onBack={() => {}}
-      /> */}
+
     </div>
   );
 }

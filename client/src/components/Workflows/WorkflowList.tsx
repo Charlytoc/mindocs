@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { deleteWorkflow, getWorkflows } from "../../utils/api";
 import { useAuthStore } from "../../infrastructure/store";
 import toast from "react-hot-toast";
+import { WorkflowForm } from "./WorkflowForm";
 
 interface Workflow {
   id: string;
@@ -98,6 +99,7 @@ export const WorkflowList = ({ onSelectWorkflow }: WorkflowListProps) => {
 
   return (
     <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <WorkflowForm />
       <div className="max-w-4xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {workflows.map((workflow) => (

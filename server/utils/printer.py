@@ -49,6 +49,9 @@ class Printer:
         with open(self.error_file_path, "a", encoding="utf-8") as f:
             f.write(f"{msg}\n")  # Sin color para el archivo
 
+    def success(self, *args):
+        msg = " ".join(str(arg) for arg in args)
+        print(self._format("green", msg))
 
     def debug(self, *args):
         if self.log_level == "debug":

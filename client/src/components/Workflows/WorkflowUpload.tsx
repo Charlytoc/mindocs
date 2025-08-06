@@ -15,14 +15,12 @@ interface WorkflowUploadProps {
   workflow: Workflow;
   // fetchWorkflow: () => void;
   onUploadSuccess: ({ execution_id }: { execution_id: string }) => void;
-  onBack: () => void;
 }
 
 export const WorkflowUpload = ({
   workflow,
   // fetchWorkflow,
   onUploadSuccess,
-  onBack,
 }: WorkflowUploadProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const [descriptions, setDescriptions] = useState<string[]>([]);
@@ -53,7 +51,7 @@ export const WorkflowUpload = ({
     setDescriptions(newDescriptions);
   };
 
-  const handleAudioRecorded = (audioBlob: Blob, audioUrl: string) => {
+  const handleAudioRecorded = (audioBlob: Blob) => {
     // Generate a unique filename with timestamp and random hash
     const timestamp = Date.now();
     const randomHash = Math.random().toString(36).substring(2, 15);

@@ -4,18 +4,26 @@ type ModalProps = {
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
+  backdropClassName?: string;
+  modalClassName?: string;
 };
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children }) => {
+export const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  children,
+  backdropClassName,
+  modalClassName,
+}) => {
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md"
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-md ${backdropClassName}`}
       onClick={onClose}
     >
       <div
-        className="relative bg-white rounded-xl p-6 max-w-xl max-h-[80vh] w-full shadow-2xl transform transition-all scale-100 animate-fade-in overflow-y-auto no-scrollbar"
+        className={`relative bg-white rounded-xl p-6 max-w-3xl max-h-[90vh] w-full shadow-2xl transform transition-all scale-100 animate-fade-in overflow-y-auto no-scrollbar ${modalClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}

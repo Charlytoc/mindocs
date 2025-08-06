@@ -53,8 +53,27 @@ export const deleteAccount = async (email: string, password: string) => {
   }
 };
 
-export const createWorkflow = async (formData: FormData, userEmail: string) => {
+export const createWorkflow = async (
+  name: string,
+  description: string,
+  instructions: string,
+  files: File[],
+  descriptions: string[],
+  userEmail: string
+) => {
   try {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("instructions", instructions);
+
+    files.forEach((file, index) => {
+      formData.append("output_examples", file);
+      if (descriptions[index]) {
+        formData.append("output_examples_description", descriptions[index]);
+      }
+    });
+
     const response = await axios.post(`${API_URL}/api/workflow`, formData, {
       headers: { "x-user-email": userEmail },
     });
@@ -284,69 +303,6 @@ export const getCaseStatus = async (caseId: string) => {
   }
 };
 
-export const updateDemand = async (caseId: string, htmlContent: string) => {
-  try {
-    const formData = new FormData();
-    formData.append("html_content", htmlContent);
-
-    const response = await axios.put(
-      `${API_URL}/api/case/${caseId}/demand`,
-      formData
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error al actualizar la demanda:", error);
-    throw new Error("Hubo un error al actualizar la demanda");
-  }
-};
-
-export const updateAgreement = async (caseId: string, htmlContent: string) => {
-  try {
-    const formData = new FormData();
-    formData.append("html_content", htmlContent);
-
-    const response = await axios.put(
-      `${API_URL}/api/case/${caseId}/agreement`,
-      formData
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error al actualizar el convenio:", error);
-    throw new Error("Hubo un error al actualizar el convenio");
-  }
-};
-
-export const requestAIChanges = async (
-  caseId: string,
-  documentType: "demand" | "agreement",
-  userFeedback: string
-) => {
-  try {
-    const formData = new FormData();
-    formData.append("document_type", documentType);
-    formData.append("user_feedback", userFeedback);
-
-    const response = await axios.post(
-      `${API_URL}/api/case/${caseId}/request-ai-changes`,
-      formData
-    );
-    return response.data;
-  } catch (error) {
-    console.error("Error al solicitar cambios a la IA:", error);
-    throw new Error("Hubo un error al solicitar cambios a la IA");
-  }
-};
-
-export const approveCase = async (caseId: string) => {
-  try {
-    const response = await axios.post(`${API_URL}/api/case/${caseId}/approve`);
-    return response.data;
-  } catch (error) {
-    console.error("Error al aprobar el caso:", error);
-    throw new Error("Hubo un error al aprobar el caso");
-  }
-};
-
 export const deleteWorkflowExecution = async (
   executionId: string,
   userEmail: string
@@ -416,5 +372,29 @@ export const getSupportedExportTypes = async () => {
   } catch (error) {
     console.error("Error al obtener tipos de exportación:", error);
     throw new Error("Hubo un error al obtener los tipos de exportación");
+  }
+};
+
+export const requestChanges = async (
+  assetId: string,
+  changes: string,
+  userEmail: string,
+  not_id: string
+) => {
+  const formData = new FormData();
+  formData.append("changes", changes);
+  formData.append("not_id", not_id);
+  try {
+    const response = await axios.post(
+      `${API_URL}/api/request-changes/${assetId}`,
+      formData,
+      {
+        headers: { "x-user-email": userEmail },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error al solicitar cambios a la IA:", error);
+    throw new Error("Hubo un error al solicitar cambios a la IA");
   }
 };
