@@ -31,7 +31,6 @@ printer = Printer("TASKS")
 def async_process_workflow_execution(self, workflow_execution_id: str):
     try:
         printer.info(f"Procesando ejecución de workflow {workflow_execution_id}")
-        time.sleep(4)
         redis_client.publish(
             "workflow_updates",
             json.dumps(

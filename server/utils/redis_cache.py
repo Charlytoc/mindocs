@@ -13,6 +13,7 @@ class RedisCache:
             db=int(os.getenv("REDIS_DB", 0)),
             password=os.getenv("REDIS_PASSWORD", None),
             decode_responses=True,
+            ssl=os.getenv("REDIS_USE_TLS", "false").lower() == "true",
         )
 
     # ------------ Strings ------------
