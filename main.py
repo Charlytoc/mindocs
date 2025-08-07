@@ -95,13 +95,13 @@ async def auth_and_cors(request: Request, call_next):
             return JSONResponse(
                 status_code=403, content={"detail": f"Origin '{origin}' no permitido."}
             )
-    else:
-        client_ip = request.client.host
-        if len(ALLOWED_IPS) > 0 and client_ip not in ALLOWED_IPS:
-            printer.yellow(f"IP '{client_ip}' no permitida.")
-            return JSONResponse(
-                status_code=403, content={"detail": f"IP '{client_ip}' no permitida."}
-            )
+    # else:
+    #     client_ip = request.client.host
+    #     if len(ALLOWED_IPS) > 0 and client_ip not in ALLOWED_IPS:
+    #         printer.yellow(f"IP '{client_ip}' no permitida.")
+    #         return JSONResponse(
+    #             status_code=403, content={"detail": f"IP '{client_ip}' no permitida."}
+    #         )
 
     printer.green("Una solicitud fue permitida con éxito a las ", datetime.now())
     return await call_next(request)
