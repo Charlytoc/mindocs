@@ -2,6 +2,9 @@ from celery import Celery
 import os
 import platform
 import ssl
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Config Redis
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
