@@ -25,7 +25,7 @@ export const Navigation = () => {
                 }}
                 className="text-xl font-bold text-gray-800"
               >
-                DocuFácil
+                MindDocs
               </h1>
             </div>
           </div>
