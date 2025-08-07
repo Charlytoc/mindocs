@@ -377,6 +377,7 @@ async def start_workflow(
         )
         session.add(asset)
         await session.flush()
+        printer.yellow("Asset with input text created")
     for idx, file in enumerate(input_files):
         desc = (
             input_descriptions[idx]
@@ -399,7 +400,6 @@ async def start_workflow(
             shutil.copyfileobj(file.file, buffer)
         assets.append(asset)
     await session.commit()
-    # Aquí podrías lanzar tarea async de procesamiento
     async_process_workflow_execution.delay(execution.id)
     return JSONResponse(
         {
