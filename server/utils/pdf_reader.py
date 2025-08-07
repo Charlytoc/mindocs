@@ -83,6 +83,7 @@ def get_base64_image(page: fitz.Page) -> str:
 
 class PyMuPDFWithOCRStrategy(DocumentStrategy):
     SAMPLE_PAGES = 3
+    MAX_OCR_PAGES_PER_READ = 7
 
     def __init__(self):
         self.ai = AIInterface(
@@ -94,17 +95,28 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
     def read(self, path: str) -> str:
         pages = []
         with fitz.open(path, filetype="pdf") as pdf:
-
             what_to_do = self.select_strategy(pdf)
 
-            for page in pdf:
-                text = page.get_text()
-                if not text.strip() or what_to_do == "OCR":
-                    printer.yellow(
-                        f"Page {page.number} could contain images, extracting with AI..."
+            if what_to_do == "OCR":
+                # Procesar en lotes de MAX_OCR_PAGES_PER_READ
+                total_pages = pdf.page_count
+                for i in range(0, total_pages, self.MAX_OCR_PAGES_PER_READ):
+                    batch = []
+                    page_indices = range(
+                        i, min(i + self.MAX_OCR_PAGES_PER_READ, total_pages)
                     )
-
-                    img_str = get_base64_image(page)
+                    for page_idx in page_indices:
+                        page = pdf[page_idx]
+                        img_str = get_base64_image(page)
+                        batch.append(
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{img_str}"
+                                },
+                            }
+                        )
+                    # Un solo mensaje con varias imágenes
                     res = self.ai.chat(
                         model=os.getenv("MODEL", "gemma3"),
                         messages=[
@@ -113,20 +125,25 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
                                 "content": [
                                     {
                                         "type": "text",
-                                        "text": "Extrae el texto de la imagen así como un resumen de la imagen, si no hay texto, solo explica en qué consiste la imagen. Esta imagen es parte de un documento PDF, por lo que el texto que extraigas debe ser parte del documento PDF.",
+                                        "text": (
+                                            "Extrae el texto de CADA imagen adjunta. Si hay elementos gráficos asociados, explícalo."
+                                            "Devuelve un bloque por página, en el mismo orden. "
+                                            "Si una imagen no tiene texto, explícalo."
+                                        ),
                                     },
-                                    {
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": f"data:image/jpeg;base64,{img_str}"
-                                        },
-                                    },
+                                    *batch,
                                 ],
                             }
                         ],
                     )
-                    text = res.choices[0].message.content
-                pages.append(text)
+                    # Suponiendo que la respuesta contiene bloques de texto separados por marcador
+                    batch_texts = res.choices[0].message.content.split(PAGE_CONNECTOR)
+                    pages.extend(batch_texts)
+            else:
+                # Estrategia normal, página por página
+                for page in pdf:
+                    text = page.get_text()
+                    pages.append(text)
         return PAGE_CONNECTOR.join(pages)
 
     def select_strategy(self, sample: FPDFDocument):
