@@ -2,6 +2,10 @@
 
 VENV_DIR="venv"
 REDIS_FLAG=false
+MODE=""
+WORKERS=""
+APP_MODULE="main:app"
+PORT="${PORT:-8005}"
 
 # --- PARSEO DE ARGUMENTOS ---
 while [[ "$#" -gt 0 ]]; do
@@ -12,17 +16,45 @@ while [[ "$#" -gt 0 ]]; do
             fi
             shift 2
             ;;
+        -m|--mode)
+            MODE="$2"
+            shift 2
+            ;;
+        -w|--workers)
+            WORKERS="$2"
+            shift 2
+            ;;
         *)
             shift
             ;;
     esac
 done
 
+# --- PEDIR MODO SI NO SE ESPECIFICA ---
+if [[ -z "$MODE" ]]; then
+    read -p "¿Modo de ejecución? (dev/prod): " MODE
+    MODE="${MODE,,}"  # minusculas
+fi
+
+# --- VALIDAR MODO ---
+if [[ "$MODE" != "dev" && "$MODE" != "prod" ]]; then
+    echo "❌ Modo inválido: $MODE. Debe ser 'dev' o 'prod'."
+    exit 1
+fi
+
+# --- PEDIR WORKERS SI NO SE ESPECIFICA Y ES PROD ---
+if [[ "$MODE" == "prod" && -z "$WORKERS" ]]; then
+    read -p "¿Cuántos workers para Gunicorn? (default: 2): " WORKERS
+    WORKERS="${WORKERS:-2}"
+fi
+
 # --- DETECTAR SISTEMA OPERATIVO ---
-if [[ "$OSTYPE" == "msys" ]]; then
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]]; then
     ACTIVATE_CMD="$VENV_DIR/Scripts/activate"
+    IS_WINDOWS=true
 else
     ACTIVATE_CMD="$VENV_DIR/bin/activate"
+    IS_WINDOWS=false
 fi
 
 echo "🔍 Verificando entorno virtual..."
@@ -64,7 +96,18 @@ else
     echo "ℹ️  Flag de Redis desactivada. No se iniciará/verificará Redis."
 fi
 
-export ENVIRONMENT=prod
+export ENVIRONMENT="$MODE"
 
-echo "🚀 Iniciando la aplicación FastAPI..."
-python main.py
+echo "⚡ Lanzando la aplicación FastAPI..."
+if [ "$MODE" = "prod" ]; then
+    if [ "$IS_WINDOWS" = true ]; then
+        echo "⚠️ Windows detectado: iniciando FastAPI con Uvicorn (Gunicorn no es compatible)..."
+        uvicorn $APP_MODULE --host 0.0.0.0 --port $PORT
+    else
+        echo "🐧 Linux detectado: iniciando FastAPI con Gunicorn + UvicornWorker ($WORKERS workers)..."
+        gunicorn $APP_MODULE -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers $WORKERS
+    fi
+else
+    echo "🛠️ Modo desarrollo: iniciando FastAPI con Uvicorn en modo recarga..."
+    uvicorn $APP_MODULE --host 0.0.0.0 --port $PORT --reload
+fi
