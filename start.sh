@@ -5,7 +5,7 @@ REDIS_FLAG=false
 MODE=""
 WORKERS=""
 APP_MODULE="main:app"
-PORT="${PORT:-8005}"
+PORT="${PORT:-8000}"
 
 # --- PARSEO DE ARGUMENTOS ---
 while [[ "$#" -gt 0 ]]; do
