@@ -6,9 +6,14 @@ import platform
 
 # Config Redis
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = os.getenv("REDIS_PORT", "6380")
+REDIS_PORT = os.getenv("REDIS_PORT", "6389")
 REDIS_DB = os.getenv("REDIS_DB", "0")
-REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+REDIS_USE_TLS = os.getenv("REDIS_USE_TLS", "false")
+
+if REDIS_USE_TLS.lower() == "true":
+    REDIS_URL = f"rediss://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+else:
+    REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 
 # Inicializa Celery
