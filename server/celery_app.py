@@ -1,29 +1,28 @@
-# server/celery_app.py
 from celery import Celery
 import os
 import platform
-
+import ssl
 
 # Config Redis
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = os.getenv("REDIS_PORT", "6389")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")  # Debe ser 6379 para ElastiCache Valkey
 REDIS_DB = os.getenv("REDIS_DB", "0")
-REDIS_USE_TLS = os.getenv("REDIS_USE_TLS", "false")
+REDIS_USE_TLS = os.getenv("REDIS_USE_TLS", "false").lower() == "true"
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 
-if REDIS_USE_TLS.lower() == "true":
-    REDIS_URL = f"rediss://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+if REDIS_PASSWORD:
+    URL_PREFIX = "rediss" if REDIS_USE_TLS else "redis"
+    REDIS_URL = f"{URL_PREFIX}://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 else:
-    REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    URL_PREFIX = "rediss" if REDIS_USE_TLS else "redis"
+    REDIS_URL = f"{URL_PREFIX}://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
-
-# Inicializa Celery
 celery = Celery(
     "worker_demandas",
     broker=REDIS_URL,
     backend=REDIS_URL,
 )
 
-# Configuración general
 celery.conf.update(
     task_serializer="json",
     result_serializer="json",
@@ -33,12 +32,19 @@ celery.conf.update(
     task_track_started=True,
 )
 
+# SSL options si usas TLS
+if REDIS_USE_TLS:
+    ssl_options = {
+        "ssl_cert_reqs": ssl.CERT_NONE,  # Para no validar certificados (útil para ElastiCache)
+        # Si quieres validar el certificado, usa ssl.CERT_REQUIRED y proporciona "ssl_ca_certs"
+    }
+    celery.conf.broker_use_ssl = ssl_options
+    celery.conf.redis_backend_use_ssl = ssl_options
+
 # Ajuste dinámico del pool según el sistema operativo
 if platform.system() == "Windows":
-    # Celery no soporta prefork en Windows, usar threads
     celery.conf.worker_pool = "threads"
     celery.conf.worker_concurrency = int(os.getenv("CELERY_CONCURRENCY", "4"))
 else:
-    # En sistemas tipo Unix, usar prefork por defecto
     celery.conf.worker_pool = os.getenv("CELERY_POOL", "prefork")
     celery.conf.worker_concurrency = int(os.getenv("CELERY_CONCURRENCY", "8"))
