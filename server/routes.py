@@ -33,6 +33,7 @@ from server.models import (
 )
 from server.utils.printer import Printer
 from server.utils.csv_logger import CSVLogger
+
 # from server.utils.pdf_reader import DocumentReader
 
 csv_logger = CSVLogger()
@@ -384,6 +385,7 @@ async def start_workflow(
             if input_descriptions and idx < len(input_descriptions)
             else None
         )
+        printer.yellow(file.filename, "Processing file")
         asset = Asset(
             workflow_execution_id=execution.id,
             name=file.filename,
@@ -394,12 +396,17 @@ async def start_workflow(
         )
         session.add(asset)
         await session.flush()
+        printer.yellow(asset.id, "Asset created")
         ext = os.path.splitext(file.filename)[1]
         file_path = f"{upload_path}/{asset.id}{ext}"
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         assets.append(asset)
     await session.commit()
+
+    printer.yellow(
+        execution.id, "Execution created, starting processing in background..."
+    )
     async_process_workflow_execution.delay(execution.id)
     return JSONResponse(
         {
