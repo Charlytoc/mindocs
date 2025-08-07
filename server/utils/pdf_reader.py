@@ -7,7 +7,8 @@ import hashlib
 import fitz  # PyMuPDF
 from fitz import Document as FPDFDocument
 from server.utils.printer import Printer
-import pytesseract
+
+# import pytesseract
 import base64
 from PIL import Image
 import io
@@ -23,21 +24,21 @@ PAGE_CONNECTOR = "\n---PAGE---\n"
 printer = Printer("PDF_READER")
 
 
-tesseract_cmd = os.getenv("TESSERACT_CMD")
-if tesseract_cmd:
-    print("🔍 Usando tesseract_cmd:", tesseract_cmd)
+# tesseract_cmd = os.getenv("TESSERACT_CMD")
+# if tesseract_cmd:
+#     print("🔍 Usando tesseract_cmd:", tesseract_cmd)
 
-    # Si es Windows, aseguramos que termina en tesseract.exe
-    if os.name == "nt":
-        if os.path.isdir(tesseract_cmd):
-            tesseract_cmd = os.path.join(tesseract_cmd, "tesseract.exe")
+#     # Si es Windows, aseguramos que termina en tesseract.exe
+#     if os.name == "nt":
+#         if os.path.isdir(tesseract_cmd):
+#             tesseract_cmd = os.path.join(tesseract_cmd, "tesseract.exe")
 
-        if not os.path.isfile(tesseract_cmd):
-            raise FileNotFoundError(
-                f"El ejecutable de tesseract no se encontró en: {tesseract_cmd}"
-            )
+#         if not os.path.isfile(tesseract_cmd):
+#             raise FileNotFoundError(
+#                 f"El ejecutable de tesseract no se encontró en: {tesseract_cmd}"
+#             )
 
-    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+#     pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
 
 class DocumentStrategy(ABC):
@@ -81,7 +82,14 @@ def get_base64_image(page: fitz.Page) -> str:
 
 
 class PyMuPDFWithOCRStrategy(DocumentStrategy):
-    SAMPLE_PAGES = 4
+    SAMPLE_PAGES = 3
+
+    def __init__(self):
+        self.ai = AIInterface(
+            provider=os.getenv("PROVIDER", "ollama"),
+            api_key=os.getenv("PROVIDER_API_KEY", "asdasd"),
+            base_url=os.getenv("PROVIDER_BASE_URL", None),
+        )
 
     def read(self, path: str) -> str:
         pages = []
@@ -93,15 +101,11 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
                 text = page.get_text()
                 if not text.strip() or what_to_do == "OCR":
                     printer.yellow(
-                        f"Page {page.number} could contain images, extracing with AI..."
+                        f"Page {page.number} could contain images, extracting with AI..."
                     )
-                    ai = AIInterface(
-                        provider=os.getenv("PROVIDER", "ollama"),
-                        api_key=os.getenv("PROVIDER_API_KEY", "asdasd"),
-                        base_url=os.getenv("PROVIDER_BASE_URL", None),
-                    )
+
                     img_str = get_base64_image(page)
-                    res = ai.chat(
+                    res = self.ai.chat(
                         model=os.getenv("MODEL", "gemma3"),
                         messages=[
                             {
@@ -134,9 +138,28 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
 
         for page in sample.pages(0, sample_count):
             text_result = page.get_text()
-            pix = page.get_pixmap()
-            img = Image.open(io.BytesIO(pix.tobytes()))
-            ocr_result = pytesseract.image_to_string(img)
+            img_str = get_base64_image(page)
+            res = self.ai.chat(
+                model=os.getenv("MODEL", "gemma3"),
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Extrae únicamente el texto presente en la imagen, si no hay texto, devuelve un texto vacío que diga: 'EMPTY'.",
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{img_str}"
+                                },
+                            },
+                        ],
+                    },
+                ],
+            )
+            ocr_result = res.choices[0].message.content
 
             if len(text_result) > len(ocr_result):
                 sample_results.append("TEXT")

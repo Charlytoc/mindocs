@@ -33,7 +33,7 @@ from server.models import (
 )
 from server.utils.printer import Printer
 from server.utils.csv_logger import CSVLogger
-from server.utils.pdf_reader import DocumentReader
+# from server.utils.pdf_reader import DocumentReader
 
 csv_logger = CSVLogger()
 printer = Printer("ROUTES")
