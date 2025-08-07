@@ -404,10 +404,10 @@ async def start_workflow(
         assets.append(asset)
     await session.commit()
 
+    async_process_workflow_execution.delay(execution.id)
     printer.yellow(
         execution.id, "Execution created, starting processing in background..."
     )
-    async_process_workflow_execution.delay(execution.id)
     return JSONResponse(
         {
             "workflow_execution_id": str(execution.id),
