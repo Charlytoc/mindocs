@@ -29,6 +29,7 @@ os.makedirs("uploads/documents", exist_ok=True)
 os.makedirs("uploads/documents/read", exist_ok=True)
 
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     printer.green("Iniciando aplicación, hora: ", datetime.now())

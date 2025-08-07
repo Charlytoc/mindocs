@@ -8,8 +8,9 @@ printer = Printer("NOTIFICATIONS")
 
 
 async def redis_to_socketio_bridge():
+    use_tls = os.getenv("REDIS_USE_TLS", "false").lower() == "true"
     r = redis.Redis.from_url(
-        f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
+        f"redis{'s' if use_tls else ''}://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
     )
 
     printer.green("Redis connected")
@@ -39,8 +40,9 @@ async def redis_to_socketio_bridge():
 
 
 async def redis_to_socketio_bridge_notifications():
+    use_tls = os.getenv("REDIS_USE_TLS", "false").lower() == "true"
     r = redis.Redis.from_url(
-        f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
+        f"redis{'s' if use_tls else ''}://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB')}"
     )
     printer.green("Redis connected")
     pubsub = r.pubsub()
