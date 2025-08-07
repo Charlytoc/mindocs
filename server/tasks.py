@@ -44,6 +44,9 @@ def async_process_workflow_execution(self, workflow_execution_id: str):
                 }
             ),
         )
+        printer.green(
+            f"Message sent to socketio to room: workflow_{workflow_execution_id}"
+        )
 
         return process_workflow_execution(str(workflow_execution_id))
     except Exception as e:

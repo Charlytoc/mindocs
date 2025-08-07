@@ -1,8 +1,11 @@
 import os
 import redis
 from dotenv import load_dotenv
+from server.utils.printer import Printer
 
 load_dotenv()
+
+printer = Printer("REDIS_CACHE")
 
 
 class RedisCache:
@@ -45,7 +48,9 @@ class RedisCache:
         return self.client.hgetall(name)
 
     def publish(self, channel: str, message: str) -> None:
+        printer.green(f"Publishing message to channel: {channel}")
         self.client.publish(channel, message)
+        printer.green(f"Message published to channel: {channel}")
 
 
 redis_client = RedisCache()
