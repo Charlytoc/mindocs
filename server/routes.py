@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from server.examples.workflows import INITIAL_WORKFLOWS
 
 from server.db import get_session
 from server.models import (
@@ -74,6 +75,21 @@ async def signup(
         raise HTTPException(status_code=400, detail="Email already exists")
     user = User(email=email, name=name, password=password)
     session.add(user)
+    await session.flush()  # Para generar user.id si es autogenerado
+
+    # Crear workflows predefinidos
+    workflows = []
+    for workflow in INITIAL_WORKFLOWS:
+        workflows.append(
+            Workflow(
+                name=workflow["name"],
+                description=workflow["description"],
+                instructions=workflow["instructions"],
+                user_id=user.id,
+            )
+        )
+        
+    session.add_all(workflows)
     await session.commit()
     return {"message": "Signup successful"}
 
