@@ -134,6 +134,10 @@ export const WorkflowUpload = ({
     setAudioRecordings([]);
   };
 
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8">
       {/* Upload Form */}
@@ -157,7 +161,7 @@ export const WorkflowUpload = ({
           </label>
           <FileInput
             label="Seleccionar archivos"
-            accept="image/*,.pdf,.doc,.docx,.txt"
+            accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,audio/mpeg,audio/wav,audio/mp4,audio/webm,audio/weba"
             multiple={true}
             name="files"
             onChange={handleFileChange}
@@ -180,10 +184,25 @@ export const WorkflowUpload = ({
               Descripciones de archivos
             </h3>
             {files.map((file, index) => (
-              <div key={index} className="space-y-2">
+              <div
+                key={index}
+                className="space-y-2 p-4 border border-gray-200 rounded-lg bg-gray-50"
+              >
                 <label className="block text-sm font-medium text-gray-700">
                   {file.name}
                 </label>
+
+                {/* Audio player for audio files */}
+                {file.type.startsWith("audio/") && (
+                  <div className="mb-3">
+                    <audio
+                      controls
+                      src={URL.createObjectURL(file)}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+
                 <textarea
                   value={descriptions[index] || ""}
                   onChange={(e) =>
@@ -193,6 +212,15 @@ export const WorkflowUpload = ({
                   placeholder="Descripción opcional del archivo..."
                   rows={2}
                 />
+                <div className="flex justify-end items-center">
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="text-red-600 hover:text-red-800 text-sm bg-red-100 px-2 py-1 rounded-md cursor-pointer hover:bg-red-200"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -209,18 +237,6 @@ export const WorkflowUpload = ({
                 key={index}
                 className="space-y-2 p-4 border border-gray-200 rounded-lg bg-gray-50"
               >
-                <div className="flex justify-between items-center">
-                  <label className="block text-sm font-medium text-gray-700">
-                    🎤 {recording.name}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => removeAudioRecording(index)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    🗑️ Eliminar
-                  </button>
-                </div>
                 <audio
                   controls
                   src={URL.createObjectURL(recording.blob)}
@@ -235,6 +251,15 @@ export const WorkflowUpload = ({
                   placeholder="Descripción opcional de la grabación..."
                   rows={2}
                 />
+                <div className="flex justify-end items-center">
+                  <button
+                    type="button"
+                    onClick={() => removeAudioRecording(index)}
+                    className="text-red-600 hover:text-red-800 text-sm bg-red-100 px-2 py-1 rounded-md cursor-pointer hover:bg-red-200"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
               </div>
             ))}
           </div>

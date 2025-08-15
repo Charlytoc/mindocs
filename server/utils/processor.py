@@ -35,7 +35,7 @@ def send_message_to_user(message: str, workflow_execution_id: str):
         json.dumps(
             {
                 "workflow_execution_id": workflow_execution_id,
-                "log": message,
+                "log": f"<AI_MESSAGE>{message}</AI_MESSAGE>",
                 "status": "PROCESSING",
                 "assets_ready": False,
             }
@@ -58,14 +58,11 @@ def process_workflow_execution(workflow_execution_id: str):
 
         log = w.generation_log
         if not log:
-            log = f"<workflow_execution>{workflow_execution_id}</workflow_execution>"
+            log = "Ejecución iniciada.\n"
             w.generation_log = log
             session.commit()
 
         assets = w.assets
-
-        log += f"<instructions>{w.workflow.instructions}</instructions>"
-        printer.info(log)
 
         w.status = WorkflowExecutionStatus.IN_PROGRESS
         w.started_at = datetime.now()
@@ -77,7 +74,7 @@ def process_workflow_execution(workflow_execution_id: str):
         for asset in assets:
             if asset.status == AssetStatus.DONE:
                 continue
-            log += f"<asset>{asset.name}</asset>"
+            log += f"Procesando archivo: {asset.name}\n"
             if asset.asset_type == AssetType.FILE:
                 file_extension = os.path.splitext(asset.name)[1]
                 file_path = (
@@ -85,22 +82,19 @@ def process_workflow_execution(workflow_execution_id: str):
                 )
                 ext = file_extension.lower()
                 extracted_text = None
-                printer.info(f"Procesando archivo {asset.name}")
                 if ext in [".pdf", ".docx"]:
                     extracted_text = document_reader.read(file_path)
-                    log += (
-                        f"<document_extraction>{extracted_text}</document_extraction>"
-                    )
+                    log += f"Contenido del archivo {asset.name} extraído con exito.\n"
                 elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
                     extracted_text = image_reader.read(
                         file_path,
-                        f"Nombre del archivo adjunto: {asset.name}. Se está realizando un flujo de trabajo que requiere de la información de la imagen. Las instrucciones del flujo de trabajo son: {w.workflow.instructions}. Extraer la información que pueda ser útil para el flujo de trabajo.",
+                        f"Nombre del archivo adjunto: {asset.name}. Se está realizando un flujo de trabajo que requiere de la información de la imagen. Las instrucciones del flujo de trabajo son: {w.workflow.instructions}. Extraer la información que pueda ser útil para el flujo de trabajo. Si está disponible, esta descripción puede ser útil: {asset.brief}",
                     )
-                    log += f"<image_extraction>{extracted_text}</image_extraction>"
+                    log += f"Contenido de la imagen {asset.name} extraído con exito.\n"
                 elif ext in [".txt", ".xml", ".html", ".md", ".json", ".csv"]:
                     with open(file_path, "r", encoding="utf-8") as f:
                         extracted_text = f.read()
-                    log += f"<text_extraction>{extracted_text}</text_extraction>"
+                    log += f"Contenido del archivo {asset.name} extraído con exito.\n"
                 elif ext in [".mp3", ".wav", ".m4a", ".webm"]:
                     redis_client.publish(
                         "workflow_updates",
@@ -114,20 +108,19 @@ def process_workflow_execution(workflow_execution_id: str):
                         ),
                     )
                     extracted_text = audio_reader.read(file_path)
-                    log += (
-                        f"<audio_transcription>{extracted_text}</audio_transcription>"
-                    )
-                    redis_client.publish(
-                        "workflow_updates",
-                        json.dumps(
-                            {
-                                "workflow_execution_id": workflow_execution_id,
-                                "log": f"Se extrajo el texto de **{asset.name}**.",
-                                "status": "PROCESSING",
-                                "assets_ready": False,
-                            }
-                        ),
-                    )
+                    log += f"Se realizó la transcripción del audio {asset.name} con exito.\n"
+
+                redis_client.publish(
+                    "workflow_updates",
+                    json.dumps(
+                        {
+                            "workflow_execution_id": workflow_execution_id,
+                            "log": f"Se extrajo el texto de **{asset.name}**.",
+                            "status": "PROCESSING",
+                            "assets_ready": False,
+                        }
+                    ),
+                )
 
                 asset.extracted_text = extracted_text
                 asset.content = extracted_text
@@ -154,11 +147,11 @@ def process_workflow_execution(workflow_execution_id: str):
 
         def on_message(message):
             print("New response received from agent")
-            # printer.yellow(message, "MESSAGE")
+            print(message)
 
         assets_text = "\n".join(
             [
-                f"```{asset.name}\n{asset.content}\n\n> ASSET DESCRIPTION: {asset.brief or 'No description'}```"
+                f'<ASSET name="{asset.name}" description="{asset.brief or "No description"}">{asset.content}</ASSET>'
                 for asset in assets
                 if asset.content
             ]
@@ -169,10 +162,6 @@ def process_workflow_execution(workflow_execution_id: str):
                 f"<EXAMPLE name={example.name} description={example.description}>{example.content}</EXAMPLE>"
                 for example in w.workflow.output_examples
             ]
-        )
-
-        printer.cyan(
-            "<OUTPUT EXAMPLES TEXT>", output_examples_text, "<OUTPUT EXAMPLES TEXT>"
         )
 
         messages = [
@@ -220,13 +209,15 @@ def process_workflow_execution(workflow_execution_id: str):
             )
             session.add(asset)
 
-            w.generation_log += f"\n<ai_message>Se creó el asset **{name}**. Con contenido:```markdown\n{content}\n```</ai_message>"
+            w.generation_log += (
+                f"\n<ai_message>Se creó el asset **{name}**.</ai_message>"
+            )
             redis_client.publish(
                 "workflow_updates",
                 json.dumps(
                     {
                         "workflow_execution_id": workflow_execution_id,
-                        "log": f"Se creó el asset **{name}**. Con contenido: {content}",
+                        "log": f"Se creó el asset **{name}**.",
                         "status": "PROCESSING",
                         "assets_ready": False,
                     }

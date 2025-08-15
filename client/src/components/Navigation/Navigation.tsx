@@ -23,7 +23,7 @@ export const Navigation = () => {
                 onClick={() => {
                   navigate("/");
                 }}
-                className="text-xl font-bold text-gray-800"
+                className="text-xl font-bold text-gray-800 cursor-pointer"
               >
                 MindDocs
               </h1>

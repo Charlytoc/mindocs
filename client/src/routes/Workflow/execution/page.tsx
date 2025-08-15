@@ -9,6 +9,8 @@ import { useAuthStore } from "../../../infrastructure/store";
 import { Waiter } from "../../../components/Waiter/Waiter";
 import { AssetList } from "../../../components/Assets";
 import { rerunWorkflowExecution } from "../../../utils/api";
+import { Modal } from "../../../components/Modal/Modal";
+import { Markdowner } from "../../../components/Markdowner/Markdowner";
 
 type Asset = {
   id: string;
@@ -69,6 +71,7 @@ export const WorkflowExecutionDetail = () => {
   const fetchExecution = async () => {
     if (!execution_id || !user?.email) return;
     const executionData = await getWorkflowExecution(execution_id, user.email);
+    console.log(executionData, "executionData");
     setExecution(executionData);
     if (executionData.status === "DONE") {
       fetchAssets();
@@ -109,10 +112,10 @@ export const WorkflowExecutionDetail = () => {
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {/* Header Section */}
 
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          {execution?.workflow.name}
+        </h1>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            {execution?.workflow.name}
-          </h1>
           <div className="text-center">
             <div className="flex items-center justify-center gap-4 mb-6">
               {execution?.finished_at && (
@@ -140,6 +143,7 @@ export const WorkflowExecutionDetail = () => {
               >
                 🔄
               </button>
+              {execution?.log && <LogInspector log={execution?.log} />}
             </div>
 
             {/* Progress indicator for in-progress workflows */}
@@ -158,14 +162,6 @@ export const WorkflowExecutionDetail = () => {
 
         {execution?.status === "DONE" && (
           <div className="space-y-8">
-            {/* Section Title */}
-            <p className="text-gray-600">
-              Archivos subidos y documentos generados por el proceso
-            </p>
-            {/* <LogInspector log={execution?.log || ""} /> */}
-            {/* <MessagesList messages={execution?.messages || []} /> */}
-
-            {/* Assets Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <AssetList assets={allAssets} refetchAssets={fetchAssets} />
             </div>
@@ -176,33 +172,22 @@ export const WorkflowExecutionDetail = () => {
   );
 };
 
-// const LogInspector = ({ log }: { log: string }) => {
-//   const [isOpen, setIsOpen] = useState(false);
-//   return (
-//     <>
-//       <button onClick={() => setIsOpen(true)}>Ver Log</button>
-//       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-//         <div className="p-4">
-//           <h2 className="text-lg font-bold text-gray-900 mb-2">
-//             Log del Workflow
-//           </h2>
-//           <pre className="text-sm text-gray-600 whitespace-pre-wrap break-words">
-//             {log}
-//           </pre>
-//         </div>
-//       </Modal>
-//     </>
-//   );
-// };
-
-// const MessagesList = ({ messages }: { messages: Message[] }) => {
-//   return (
-//     <div>
-//       {messages.map((m) => (
-//         <div key={m.id}>
-//           <span className="font-bold">{m.role}:</span> {m.content}
-//         </div>
-//       ))}
-//     </div>
-//   );
-// };
+const LogInspector = ({ log }: { log: string }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <button onClick={() => setIsOpen(true)}>📓</button>
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+        <div
+          style={{ scrollbarWidth: "none" }}
+          className="p-4 max-h-[80vh] overflow-x-hidden overflow-y-auto"
+        >
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
+            Log del Workflow
+          </h2>
+          <Markdowner markdown={log} />
+        </div>
+      </Modal>
+    </>
+  );
+};

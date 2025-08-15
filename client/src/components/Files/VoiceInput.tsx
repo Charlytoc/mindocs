@@ -27,6 +27,27 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<number | null>(null);
 
+  // Get supported MIME types for Safari compatibility
+  const getSupportedMimeType = () => {
+    const types = [
+      "audio/webm;codecs=opus",
+      "audio/webm;codecs=pcm",
+      "audio/webm",
+      "audio/mp4",
+      "audio/ogg;codecs=opus",
+      "audio/wav",
+    ];
+
+    for (const type of types) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+
+    // Fallback for Safari - it supports basic webm without codec specification
+    return "audio/webm";
+  };
+
   // Get available audio devices
   useEffect(() => {
     const getAudioDevices = async () => {
@@ -91,11 +112,20 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           autoGainControl: true,
         },
       });
-      // wav o mp3
-      const format = "audio/webm;codecs=pcm";
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: format,
-      });
+
+      const mimeType = getSupportedMimeType();
+      let mediaRecorder: MediaRecorder;
+
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch (err) {
+        // Fallback: create MediaRecorder without specifying mimeType for Safari
+        console.warn(
+          "Failed to create MediaRecorder with specified mimeType, using default:",
+          err
+        );
+        mediaRecorder = new MediaRecorder(stream);
+      }
 
       mediaRecorderRef.current = mediaRecorder;
 
@@ -106,9 +136,13 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       };
 
       mediaRecorder.onstop = () => {
+        // Determine the correct blob type based on what was actually recorded
+        const actualMimeType =
+          mediaRecorder.mimeType || mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
+          type: actualMimeType,
         });
+
         const audioUrl = URL.createObjectURL(audioBlob);
         setRecordedAudio(audioUrl);
 
@@ -120,7 +154,8 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         stream.getTracks().forEach((track) => track.stop());
       };
 
-      mediaRecorder.start();
+      // Safari requires a timeslice for ondataavailable to fire
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -145,6 +180,13 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         clearInterval(recordingIntervalRef.current);
         recordingIntervalRef.current = null;
       }
+    }
+  };
+
+  const clearRecording = () => {
+    if (recordedAudio) {
+      URL.revokeObjectURL(recordedAudio);
+      setRecordedAudio(null);
     }
   };
 
@@ -177,34 +219,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           {error}
         </div>
       )}
-
-      {/* 
-      <div style={{ marginBottom: "15px" }}>
-        <label
-          htmlFor="audio-device"
-          style={{ display: "block", marginBottom: "5px" }}
-        >
-          Dispositivo de audio:
-        </label>
-        <select
-          id="audio-device"
-          value={selectedDevice}
-          onChange={(e) => setSelectedDevice(e.target.value)}
-          disabled={isRecording || disabled}
-          style={{
-            width: "100%",
-            padding: "8px",
-            borderRadius: "4px",
-            border: "1px solid #ccc",
-          }}
-        >
-          {audioDevices.map((device) => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.label}
-            </option>
-          ))}
-        </select>
-      </div> */}
 
       {/* Recording Controls */}
       <div style={{ marginBottom: "15px" }}>
@@ -258,28 +272,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           Grabando... {formatTime(recordingTime)}
         </div>
       )}
-
-      {/* Audio Playback */}
-      {/* {recordedAudio && (
-        <div style={{ marginBottom: "15px" }}>
-          <h4>Audio grabado:</h4>
-          <audio controls src={recordedAudio} style={{ width: "100%" }} />
-          <button
-            onClick={clearRecording}
-            style={{
-              backgroundColor: "#6c757d",
-              color: "white",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: "4px",
-              cursor: "pointer",
-              marginTop: "10px",
-            }}
-          >
-            🗑️ Eliminar grabación
-          </button>
-        </div>
-      )} */}
 
       <style>{`
         @keyframes pulse {

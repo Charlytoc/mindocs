@@ -37,8 +37,8 @@ export const WorkflowForm = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    
     e.preventDefault();
-
     if (!user) {
       toast.error("Debes estar autenticado para continuar");
       return;
@@ -126,7 +126,7 @@ export const WorkflowForm = () => {
               <FileInput
                 name="output_examples"
                 label="Archivos de ejemplo"
-                accept="image/*,.pdf,.doc,.docx,.txt"
+                accept="image/*,.pdf,.doc,.docx,.txt,.csv,.mp3,.wav,.m4a,.webm,.weba"
                 multiple={true}
                 onChange={handleFileChange}
               />

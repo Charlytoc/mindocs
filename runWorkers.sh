@@ -1,15 +1,10 @@
 #!/bin/bash
 
-LOAD_ENV=false
-
-# Procesar argumentos para --load-env/-le y concurrencia
+# Procesar argumentos para concurrencia
 CONCURRENCY=""
 ARGS=()
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
-        --load-env|-le)
-            LOAD_ENV=true
-            ;;
         -c|--concurrency)
             if [[ -n "$2" && "$2" != -* ]]; then
                 CONCURRENCY="$2"
@@ -64,17 +59,15 @@ fi
 echo "📦 Instalando dependencias desde $REQUIREMENTS_FILE..."
 pip install -r "$REQUIREMENTS_FILE"
 
-# Cargar variables del .env solo si se pidió explícitamente
+# Cargar variables del .env siempre que exista
 ENV_FILE=".env"
-if $LOAD_ENV; then
-    if [ -f "$ENV_FILE" ]; then
-        echo "📄 Cargando variables desde .env..."
-        set -o allexport
-        source "$ENV_FILE"
-        set +o allexport
-    else
-        echo "⚠️  No se encontró archivo .env para cargar variables."
-    fi
+if [ -f "$ENV_FILE" ]; then
+    echo "📄 Cargando variables desde .env..."
+    set -o allexport
+    source "$ENV_FILE"
+    set +o allexport
+else
+    echo "⚠️  No se encontró archivo .env para cargar variables."
 fi
 
 # Función para preguntar si no existen las variables necesarias

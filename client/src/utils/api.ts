@@ -1,6 +1,6 @@
 // src/api.ts
 import axios from "axios";
-export const DEV_MODE = false;
+export const DEV_MODE = true;
 export const API_URL = DEV_MODE ? "http://localhost:8006" : "";
 
 // Auth functions
@@ -360,10 +360,26 @@ export const convertAsset = async (
         },
       }
     );
+
+    console.log(response.data, "response");
     return response.data;
   } catch (error) {
     console.error("Error al convertir el asset:", error);
     throw new Error("Hubo un error al convertir el asset");
+  }
+};
+
+export const deleteAsset = async (assetId: string, userEmail: string) => {
+  try {
+    const response = await axios.delete(`${API_URL}/api/asset/${assetId}`, {
+      headers: {
+        "x-user-email": userEmail,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error al eliminar el asset:", error);
+    throw new Error("Hubo un error al eliminar el asset");
   }
 };
 

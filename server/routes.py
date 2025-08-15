@@ -88,7 +88,7 @@ async def signup(
                 user_id=user.id,
             )
         )
-        
+
     session.add_all(workflows)
     await session.commit()
     return {"message": "Signup successful"}
@@ -716,14 +716,6 @@ async def get_supported_export_types():
             "name": "CommonMark",
             "description": "CommonMark format",
         },
-        # {"type": "asciidoc", "name": "AsciiDoc", "description": "AsciiDoc format"},
-        # {
-        #     "type": "rst",
-        #     "name": "reStructuredText",
-        #     "description": "reStructuredText format",
-        # },
-        # {"type": "org", "name": "Org Mode", "description": "Emacs Org mode format"},
-        # Presentation formats
         {
             "type": "pptx",
             "name": "PowerPoint",
@@ -734,17 +726,6 @@ async def get_supported_export_types():
             "name": "OpenDocument Presentation",
             "description": "OpenDocument presentation format",
         },
-        # {
-        #     "type": "beamer",
-        #     "name": "Beamer",
-        #     "description": "LaTeX Beamer presentation",
-        # },
-        # {
-        #     "type": "revealjs",
-        #     "name": "RevealJS",
-        #     "description": "RevealJS presentation format",
-        # },
-        # Publishing formats
         {"type": "epub", "name": "EPUB", "description": "E-book format"},
         {"type": "latex", "name": "LaTeX", "description": "LaTeX document format"},
         # {"type": "tex", "name": "TeX", "description": "TeX document format"},
@@ -752,53 +733,53 @@ async def get_supported_export_types():
         {"type": "json", "name": "JSON", "description": "JavaScript Object Notation"},
         {"type": "yaml", "name": "YAML", "description": "YAML format"},
         {"type": "xml", "name": "XML", "description": "Extensible Markup Language"},
-        # Wiki formats
-        # {
-        #     "type": "mediawiki",
-        #     "name": "MediaWiki",
-        #     "description": "MediaWiki markup format",
-        # },
         {"type": "jira", "name": "Jira", "description": "Jira markup format"},
-        # {"type": "zimwiki", "name": "ZimWiki", "description": "ZimWiki format"},
-        # {"type": "vimwiki", "name": "VimWiki", "description": "VimWiki format"},
-        # {"type": "xwiki", "name": "XWiki", "description": "XWiki format"},
-        # Documentation formats
         {"type": "man", "name": "Man Page", "description": "Unix manual page format"},
-        # {"type": "docbook4", "name": "DocBook 4", "description": "DocBook 4 format"},
-        # {"type": "docbook5", "name": "DocBook 5", "description": "DocBook 5 format"},
-        # # Academic formats
-        # {"type": "jats", "name": "JATS", "description": "Journal Article Tag Suite"},
-        # {
-        #     "type": "jats_archiving",
-        #     "name": "JATS Archiving",
-        #     "description": "JATS Archiving format",
-        # },
-        # {
-        #     "type": "jats_publishing",
-        #     "name": "JATS Publishing",
-        #     "description": "JATS Publishing format",
-        # },
-        # {
-        #     "type": "jats_articleauthoring",
-        #     "name": "JATS Article Authoring",
-        #     "description": "JATS Article Authoring format",
-        # },
-        # Other formats
-        # {
-        #     "type": "opml",
-        #     "name": "OPML",
-        #     "description": "Outline Processor Markup Language",
-        # },
-        # {"type": "native", "name": "Native", "description": "Pandoc native format"},
-        # {"type": "icml", "name": "InCopy", "description": "Adobe InCopy format"},
-        # {
-        #     "type": "tei",
-        #     "name": "TEI",
-        #     "description": "Text Encoding Initiative format",
-        # },
-        # {"type": "t2t", "name": "txt2tags", "description": "txt2tags format"},
     ]
     return {"supported_types": supported_types}
+
+
+@router.delete("/asset/{asset_id}")
+async def delete_asset(
+    asset_id: str,
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...),
+):
+    # Get asset with proper relationships loaded
+    result = await session.execute(
+        select(Asset)
+        .options(
+            selectinload(Asset.workflow_execution)
+            .selectinload(WorkflowExecution.workflow)
+            .selectinload(Workflow.user)
+        )
+        .where(Asset.id == asset_id)
+    )
+    asset = result.scalar_one_or_none()
+
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    if (
+        not asset.workflow_execution
+        or not asset.workflow_execution.workflow
+        or not asset.workflow_execution.workflow.user
+    ):
+        raise HTTPException(status_code=404, detail="Asset relationships not found")
+
+    if asset.workflow_execution.workflow.user.email != x_user_email:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    try:
+        # Delete the asset from database
+        await session.delete(asset)
+        await session.commit()
+
+        return {"message": "Asset deleted successfully"}
+
+    except Exception as e:
+        printer.red(f"Error deleting asset: {e}", "ERROR")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/download-converted/{filename}")
