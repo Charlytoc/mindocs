@@ -1,6 +1,6 @@
 // src/api.ts
 import axios from "axios";
-export const DEV_MODE = true;
+export const DEV_MODE = false;
 export const API_URL = DEV_MODE ? "http://localhost:8006" : "";
 
 // Auth functions
