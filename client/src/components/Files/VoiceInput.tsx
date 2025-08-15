@@ -183,12 +183,12 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     }
   };
 
-  const clearRecording = () => {
-    if (recordedAudio) {
-      URL.revokeObjectURL(recordedAudio);
-      setRecordedAudio(null);
-    }
-  };
+  // const clearRecording = () => {
+  //   if (recordedAudio) {
+  //     URL.revokeObjectURL(recordedAudio);
+  //     setRecordedAudio(null);
+  //   }
+  // };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
