@@ -10,6 +10,7 @@ from server.tasks import (
     async_process_workflow_execution,
     async_request_changes,
     async_process_example_files,
+    async_process_template_file,
 )
 
 from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException, Header
@@ -200,6 +201,9 @@ async def get_workflow(
                 "name": a.name,
                 "description": a.description,
                 "content": a.content,
+                "is_template": a.is_template,
+                "format": a.format,
+                "variables": a.variables,
             }
             for a in workflow.output_examples
         ],
@@ -213,6 +217,7 @@ async def create_workflow(
     instructions: str = Form(...),
     output_examples: Optional[List[UploadFile]] = File(None),
     output_examples_description: Optional[List[str]] = Form(None),
+    template_docx: Optional[UploadFile] = File(None),
     session: AsyncSession = Depends(get_session),
     x_user_email: str = Header(...),
 ):
@@ -231,6 +236,20 @@ async def create_workflow(
     )
     session.add(workflow)
     await session.commit()
+    
+    # Handle template_docx file
+    if template_docx:
+        if not template_docx.filename.endswith('.docx'):
+            raise HTTPException(status_code=400, detail="Template must be a .docx file")
+        
+        # Save template file
+        template_path = os.path.join(UPLOADS_PATH, workflow.id, "template.docx")
+        with open(template_path, "wb") as buffer:
+            shutil.copyfileobj(template_docx.file, buffer)
+        
+        async_process_template_file.delay(workflow.id, template_path)
+        print(f"Template saved as example with is_template=True: {template_path}")
+    
     if output_examples:
         file_paths = [
             f"{UPLOADS_PATH}/{output_example.filename}"
@@ -335,7 +354,7 @@ async def delete_workflow_execution(
 
 def get_asset_type_from_extension(filename: str) -> AssetType:
     extension = os.path.splitext(filename)[1]
-    if extension in [".pdf", ".docx", ".doc", ".txt", ".jpg", ".png"]:
+    if extension in [".pdf", ".docx", ".txt", ".jpg", ".png"]:
         return AssetType.FILE
 
     elif extension in [".mp3", ".wav", ".m4a"]:
@@ -347,12 +366,15 @@ def get_asset_type_from_extension(filename: str) -> AssetType:
 @router.post("/start/{workflow_id}")
 async def start_workflow(
     workflow_id: str,
-    input_files: List[UploadFile] = File(...),
+    input_files: Optional[List[UploadFile]] = File(None),
     input_descriptions: Optional[List[str]] = Form(None),
     input_text: Optional[str] = Form(None),
     session: AsyncSession = Depends(get_session),
     x_user_email: str = Header(...),
 ):
+    if not input_files and not input_text:
+        raise HTTPException(status_code=400, detail="No input files or text provided")
+    
     # Busca el usuario
     result = await session.execute(select(User).where(User.email == x_user_email))
     user = result.scalar_one_or_none()
@@ -395,29 +417,30 @@ async def start_workflow(
         session.add(asset)
         await session.flush()
         printer.yellow("Asset with input text created")
-    for idx, file in enumerate(input_files):
-        desc = (
-            input_descriptions[idx]
-            if input_descriptions and idx < len(input_descriptions)
-            else None
-        )
-        printer.yellow(file.filename, "Processing file")
-        asset = Asset(
-            workflow_execution_id=execution.id,
-            name=file.filename,
-            asset_type=AssetType.FILE,
-            origin=AssetOrigin.UPLOAD,
-            status=AssetStatus.PENDING,
-            brief=desc,
-        )
-        session.add(asset)
-        await session.flush()
-        printer.yellow(asset.id, "Asset created")
-        ext = os.path.splitext(file.filename)[1]
-        file_path = f"{upload_path}/{asset.id}{ext}"
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        assets.append(asset)
+    if input_files:
+        for idx, file in enumerate(input_files):
+            desc = (
+                input_descriptions[idx]
+                if input_descriptions and idx < len(input_descriptions)
+                else None
+            )
+            printer.yellow(file.filename, "Processing file")
+            asset = Asset(
+                workflow_execution_id=execution.id,
+                name=file.filename,
+                asset_type=AssetType.FILE,
+                origin=AssetOrigin.UPLOAD,
+                status=AssetStatus.PENDING,
+                brief=desc,
+            )
+            session.add(asset)
+            await session.flush()
+            printer.yellow(asset.id, "Asset created")
+            ext = os.path.splitext(file.filename)[1]
+            file_path = f"{upload_path}/{asset.id}{ext}"
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            assets.append(asset)
     await session.commit()
 
     printer.yellow("Execution created, orchestrating tasks...")
@@ -532,6 +555,7 @@ async def get_execution_assets(
                 "name": a.name,
                 "description": a.brief,
                 "content": a.content,
+                "format": a.format,
             }
             for a in assets_upload
         ],
@@ -542,6 +566,7 @@ async def get_execution_assets(
                 "type": a.asset_type,
                 "description": a.brief,
                 "content": a.content,
+                "format": a.format,
             }
             for a in assets_generated
         ],
@@ -789,6 +814,67 @@ async def download_file(filename: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path=file_path, filename=filename)
+
+
+@router.get("/download-asset/{asset_id}")
+async def download_asset(
+    asset_id: str,
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...),
+):
+    """Download a file asset directly"""
+    # Get asset with proper relationships loaded
+    result = await session.execute(
+        select(Asset)
+        .options(
+            selectinload(Asset.workflow_execution)
+            .selectinload(WorkflowExecution.workflow)
+            .selectinload(Workflow.user)
+        )
+        .where(Asset.id == asset_id)
+    )
+    asset = result.scalar_one_or_none()
+
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    if (
+        not asset.workflow_execution
+        or not asset.workflow_execution.workflow
+        or not asset.workflow_execution.workflow.user
+    ):
+        raise HTTPException(status_code=404, detail="Asset relationships not found")
+
+    if asset.workflow_execution.workflow.user.email != x_user_email:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    # Check if asset is of type FILE and has internal_path
+    if asset.asset_type != AssetType.FILE or not asset.internal_path:
+        raise HTTPException(status_code=400, detail="Asset is not a downloadable file")
+
+    # Check if file exists
+    file_path = asset.internal_path
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    printer.yellow(file_path, "FILE PATH")
+
+    # Get filename from asset name or path
+    filename = asset.name if asset.name else os.path.basename(file_path)
+    printer.yellow(filename, "FILENAME")
+    
+    return FileResponse(path=file_path, filename=filename)
+
+
+@router.get("/download-file")
+async def download_workflow_file(path: str):
+    """Download a workflow file (template or example)"""
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Get filename from path
+    filename = os.path.basename(path)
+    return FileResponse(path=path, filename=filename)
 
 
 @router.post("/request-changes/{asset_id}")

@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum,
     Text,
+    JSON,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -154,6 +155,7 @@ class Asset(Base):
     )
 
     name = Column(String(255), nullable=False)
+    internal_path = Column(String(255), nullable=True)
     asset_type = Column(Enum(AssetType), nullable=False)
     origin = Column(Enum(AssetOrigin), nullable=False, default=AssetOrigin.UPLOAD)
     status = Column(Enum(AssetStatus), default=AssetStatus.PENDING, nullable=False)
@@ -179,7 +181,10 @@ class WorkflowOutputExample(Base):
     )
     name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
+    internal_path = Column(String(255), nullable=True)
     format = Column(String(255), nullable=True)
+    variables = Column(JSON, nullable=True)
+    is_template = Column(Boolean, default=False, nullable=False)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

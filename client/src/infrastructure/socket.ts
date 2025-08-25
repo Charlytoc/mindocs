@@ -32,4 +32,4 @@ class SocketClient {
   }
 }
 
-export default new SocketClient(DEV_MODE ? "http://localhost:8006" : "");
+export default new SocketClient(DEV_MODE ? "http://localhost:8000" : "");

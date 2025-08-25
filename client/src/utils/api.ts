@@ -1,7 +1,7 @@
 // src/api.ts
 import axios from "axios";
 export const DEV_MODE = false;
-export const API_URL = DEV_MODE ? "http://localhost:8006" : "";
+export const API_URL = DEV_MODE ? "http://localhost:8000" : "";
 
 // Auth functions
 export const signup = async (
@@ -59,8 +59,9 @@ export const createWorkflow = async (
   name: string,
   description: string,
   instructions: string,
-  files: File[],
-  descriptions: string[],
+  templateDocx: File | null,
+  examples: File[],
+  exampleDescriptions: string[],
   userEmail: string
 ) => {
   try {
@@ -69,10 +70,16 @@ export const createWorkflow = async (
     formData.append("description", description);
     formData.append("instructions", instructions);
 
-    files.forEach((file, index) => {
+    // Add template file if provided
+    if (templateDocx) {
+      formData.append("template_docx", templateDocx);
+    }
+
+    // Add example files
+    examples.forEach((file, index) => {
       formData.append("output_examples", file);
-      if (descriptions[index]) {
-        formData.append("output_examples_description", descriptions[index]);
+      if (exampleDescriptions[index]) {
+        formData.append("output_examples_description", exampleDescriptions[index]);
       }
     });
 
@@ -414,5 +421,38 @@ export const requestChanges = async (
   } catch (error) {
     console.error("Error al solicitar cambios a la IA:", error);
     throw new Error("Hubo un error al solicitar cambios a la IA");
+  }
+};
+
+export const downloadAsset = async (
+  assetId: string,
+  assetName: string,
+  userEmail: string
+) => {
+  try {
+    const response = await axios.get(
+      `${API_URL}/api/download-asset/${assetId}`,
+      {
+        headers: {
+          "x-user-email": userEmail,
+        },
+        responseType: 'blob',
+      }
+    );
+    
+    // Create a download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${assetName}`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  } catch (error) {
+    console.error("Error al descargar el asset:", error);
+    throw new Error("Hubo un error al descargar el asset");
   }
 };

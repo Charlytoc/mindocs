@@ -57,7 +57,7 @@ fi
 
 # Instalar requerimientos
 echo "📦 Instalando dependencias desde $REQUIREMENTS_FILE..."
-pip install -r "$REQUIREMENTS_FILE"
+pip install -r "$REQUIREMENTS_FILE" --quiet
 
 # Cargar variables del .env siempre que exista
 ENV_FILE=".env"

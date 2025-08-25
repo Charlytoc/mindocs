@@ -1,44 +1,25 @@
 # utils/document_reader.py
 import subprocess
-
+import re
 from abc import ABC, abstractmethod
 import os
 import hashlib
 import fitz  # PyMuPDF
 from fitz import Document as FPDFDocument
 from server.utils.printer import Printer
-
-# import pytesseract
 import base64
 from PIL import Image
-import io
 from server.ai.ai_interface import AIInterface
 from docx import Document
+from docxtpl import DocxTemplate
 
 PAGE_CONNECTOR = "\n---PAGE---\n"
 
 
 # =========================
-# Estrategia base
+# Base strategy
 # =========================
 printer = Printer("PDF_READER")
-
-
-# tesseract_cmd = os.getenv("TESSERACT_CMD")
-# if tesseract_cmd:
-#     print("🔍 Usando tesseract_cmd:", tesseract_cmd)
-
-#     # Si es Windows, aseguramos que termina en tesseract.exe
-#     if os.name == "nt":
-#         if os.path.isdir(tesseract_cmd):
-#             tesseract_cmd = os.path.join(tesseract_cmd, "tesseract.exe")
-
-#         if not os.path.isfile(tesseract_cmd):
-#             raise FileNotFoundError(
-#                 f"El ejecutable de tesseract no se encontró en: {tesseract_cmd}"
-#             )
-
-#     pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
 
 class DocumentStrategy(ABC):
@@ -58,18 +39,6 @@ class DocumentStrategy(ABC):
 # =========================
 # Estrategias específicas
 # =========================
-
-
-def could_contain_digital_signature(text: str) -> bool:
-    suspect_terms = [
-        "firma ",
-        "OCSP",
-        "OCSP FEJEM",
-        "SHA256",
-        "EVIDENCIA CRIPTOGRÁFICA",
-        "algoritmo",
-    ]
-    return any(term in text.lower() for term in suspect_terms)
 
 
 def get_base64_image(page: fitz.Page) -> str:
@@ -194,9 +163,56 @@ class PyMuPDFWithOCRStrategy(DocumentStrategy):
 class DocxStrategy(DocumentStrategy):
     def read(self, path: str) -> str:
         doc = Document(path)
-        paragraphs = [p.text for p in doc.paragraphs if p.text]
-        return "\n".join(paragraphs)
+        parts = []
 
+        # Encabezado (header) principal
+        header = doc.sections[0].header
+        if header and header.paragraphs:
+            for para in header.paragraphs:
+                if para.text.strip():
+                    parts.append(f"{para.text.strip()}")
+
+        # Cuerpo principal (párrafos y tablas, en orden)
+        def iter_block_items(parent):
+            from docx.table import _Cell, Table
+            from docx.text.paragraph import Paragraph
+            for child in parent.element.body.iterchildren():
+                if child.tag.endswith('tbl'):
+                    yield Table(child, parent)
+                elif child.tag.endswith('p'):
+                    yield Paragraph(child, parent)
+
+        for block in iter_block_items(doc):
+            from docx.table import Table
+            from docx.text.paragraph import Paragraph
+
+            if isinstance(block, Paragraph):
+                txt = block.text.strip()
+                if txt:
+                    # Encabezados (si aplica)
+                    style = getattr(block.style, 'name', '').lower()
+                    if style.startswith('heading'):
+                        level = ''.join(filter(str.isdigit, style)) or "1"
+                        parts.append(f"{'#' * int(level)} {txt}")
+                    else:
+                        parts.append(txt)
+            elif isinstance(block, Table):
+                md_table = []
+                for i, row in enumerate(block.rows):
+                    cells = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
+                    md_table.append(" | ".join(cells))
+                    if i == 0:
+                        md_table.append(" | ".join(['---'] * len(cells)))
+                parts.append('\n'.join(md_table))
+
+        # Pies de página (footer)
+        footer = doc.sections[0].footer
+        if footer and footer.paragraphs:
+            for para in footer.paragraphs:
+                if para.text.strip():
+                    parts.append(f"> {para.text.strip()}")
+
+        return "\n\n".join(parts)
 
 class MarkdownStrategy(DocumentStrategy):
     def read(self, path: str) -> str:
@@ -258,3 +274,45 @@ class DocumentReader:
         if self.text is None:
             raise ValueError("No se ha leído ningún documento todavía")
         return self.strategy.hash_text(self.text)
+
+
+def find_placeholders(text: str) -> list[str]:
+    return re.findall(r"\{\{\s*([^\{\}\s]+)\s*\}\}", text)
+
+
+
+
+def generate_docx_from_template(template_path: str, variables: dict, output_path: str = None) -> str:
+    """
+    Generates a new .docx file from a template, replacing placeholders with variable values.
+
+    Args:
+        template_path (str): Path to the .docx template file.
+        variables (dict): Dictionary with variable_name: variable_value.
+        output_path (str, optional): Path to save the new file. If not provided, a new file will be created in the same directory.
+
+    Returns:
+        str: Path to the generated .docx file.
+    """
+    doc = DocxTemplate(template_path)
+    doc.render(variables)
+
+    if not output_path:
+        base, ext = os.path.splitext(template_path)
+        output_path = f"{base}_generated{ext}"
+
+    doc.save(output_path)
+    return output_path
+
+
+def docx_to_html(path: str) -> str:
+    """
+    Converts a .docx file to HTML using pandoc, returns the HTML as a string.
+    """
+    result = subprocess.run(
+        ["pandoc", path, "-t", "html"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout

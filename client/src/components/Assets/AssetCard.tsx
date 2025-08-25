@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Markdowner } from "../Markdowner/Markdowner";
 import { Modal } from "../Modal/Modal";
-import { deleteAsset } from "../../utils/api";
+import { deleteAsset, downloadAsset } from "../../utils/api";
 import { useAuthStore } from "../../infrastructure/store";
 import { toast } from "react-hot-toast";
 import { AssetExporter } from "./AssetExporter";
@@ -16,7 +16,9 @@ import {
   Check,
   X,
   MessageCircle,
+  Download,
 } from "lucide-react";
+import { HTMLViewer } from "../HTMLViewer/HTMLViewer";
 
 type Asset = {
   id: string;
@@ -27,6 +29,7 @@ type Asset = {
   type?: string;
   origin?: "uploaded" | "generated";
   _group?: string;
+  asset_type?: string;
 };
 
 interface AssetCardProps {
@@ -76,7 +79,29 @@ export const AssetCard = ({ asset, refetchAssets }: AssetCardProps) => {
     setShowDeleteConfirm(false);
   };
 
+  const handleDownload = async () => {
+    if (!user?.email) {
+      toast.error("Usuario no autenticado");
+      return;
+    }
+
+    setIsLoading(true);
+    const tid = toast.loading("Descargando archivo...");
+
+    try {
+      await downloadAsset(asset.id, asset.name, user.email);
+      toast.success("Archivo descargado correctamente", { id: tid });
+    } catch (error) {
+      console.error("Error downloading asset:", error);
+      toast.error("Error al descargar el archivo", { id: tid });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const isUploaded = asset.origin === "uploaded";
+  const isFileAsset = asset.type === "FILE" || asset.asset_type === "FILE";
+  console.log(asset, isFileAsset, "isFileAsset");
 
   return (
     <>
@@ -205,8 +230,8 @@ export const AssetCard = ({ asset, refetchAssets }: AssetCardProps) => {
               )}
             </div>
 
-            {/* Chat Button */}
-            {asset.content && !showDeleteConfirm && (
+
+            {asset.content && !showDeleteConfirm && !isFileAsset && (
               <button
                 className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-4 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2 font-semibold"
                 onClick={() => setShowChat(true)}
@@ -218,14 +243,49 @@ export const AssetCard = ({ asset, refetchAssets }: AssetCardProps) => {
             {/* Export Button */}
             {!showDeleteConfirm && (
               <div className="flex-1">
-                <AssetExporter assetId={asset.id} />
+                {isFileAsset ? (
+                  <button
+                    onClick={handleDownload}
+                    disabled={isLoading}
+                    className={`w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 shadow-lg ${
+                      isLoading
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700 hover:shadow-xl transform hover:scale-105"
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"></div>
+                        Descargando...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5" />
+                        Descargar
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <AssetExporter assetId={asset.id} />
+                )}
               </div>
             )}
           </div>
 
           {/* Content Preview */}
           <div className="prose prose-sm max-w-none bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 overflow-auto border border-gray-200/60 shadow-xl">
-            <Markdowner markdown={asset.content} />
+            {isFileAsset ? (
+              <>
+                <div className="text-sm text-gray-500 mb-2 text-center italic">
+                  Esta es una vista previa del documento final y puede variar
+                  significativamente del documento final, para ver el resultado
+                  final, descargue el documento.
+                </div>
+                <HTMLViewer html={asset.content} />
+              </>
+            ) : (
+              <Markdowner markdown={asset.content} />
+            )}
           </div>
         </Modal>
       )}

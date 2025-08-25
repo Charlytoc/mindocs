@@ -105,20 +105,81 @@ export const WorkflowEdit = ({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Instrucciones
+            Instrucciones para la IA
           </label>
           <textarea
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Instrucciones para el workflow"
+            placeholder="Instrucciones específicas para el agente IA"
             rows={6}
           />
           <p className="text-sm text-gray-500 mt-1">
-            Las instrucciones ayudan a la IA a entender cómo procesar los
-            archivos
+            Las instrucciones ayudan a la IA a entender cómo procesar los archivos y qué formato de salida generar
           </p>
         </div>
+
+        {/* Template y Ejemplos (solo lectura) */}
+        {workflow.examples && workflow.examples.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800">📁 Archivos del Workflow</h3>
+            
+            <div className="space-y-3">
+              {/* Template */}
+              {workflow.examples.filter(ex => ex.is_template).map((template) => (
+                <div key={template.id} className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <span className="text-blue-600 text-sm">📋</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-medium text-gray-800">{template.name}</h4>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium">
+                          Plantilla
+                        </span>
+                      </div>
+                      {template.description && (
+                        <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">Formato: {template.format || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Examples */}
+              {workflow.examples.filter(ex => !ex.is_template).map((example) => (
+                <div key={example.id} className="p-4 border border-green-200 rounded-lg bg-green-50">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
+                      <span className="text-green-600 text-xs">📄</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <h4 className="font-medium text-gray-800">{example.name}</h4>
+                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
+                          Ejemplo
+                        </span>
+                      </div>
+                      {example.description && (
+                        <p className="text-sm text-gray-600 mt-1">{example.description}</p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-1">Formato: {example.format || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-600">
+                💡 <strong>Nota:</strong> Los archivos (plantilla y ejemplos) no se pueden editar desde aquí. 
+                Para cambiar los archivos, necesitarás crear un nuevo workflow.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end space-x-4 pt-6">
           <button

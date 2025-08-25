@@ -9,6 +9,7 @@ type Asset = {
   type?: string;
   origin?: "uploaded" | "generated";
   _group?: string;
+  asset_type?: string;
 };
 
 interface AssetListProps {

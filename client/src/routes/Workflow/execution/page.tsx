@@ -18,8 +18,9 @@ type Asset = {
   description?: string;
   content: string;
   extracted_text?: string;
-  type?: string;
+  type?: "FILE" | "AUDIO" | "TEXT" | "IMAGE";
   origin?: "uploaded" | "generated";
+  asset_type?: "FILE" | "AUDIO" | "TEXT" | "IMAGE";
 };
 
 type WorkflowExecution = {
@@ -54,16 +55,19 @@ export const WorkflowExecutionDetail = () => {
       execution_id,
       user.email
     );
+    console.log(assetsData, "assetsData");
     setUploadedAssets(
       (assetsData.uploaded || []).map((a: any) => ({
         ...a,
         origin: "uploaded",
+        type: a.type || a.asset_type,
       }))
     );
     setGeneratedAssets(
       (assetsData.generated || []).map((a: any) => ({
         ...a,
         origin: "generated",
+        type: a.type || a.asset_type,
       }))
     );
   };
@@ -131,7 +135,7 @@ export const WorkflowExecutionDetail = () => {
               >
                 {execution?.status}
               </span>
-              <button
+              {/* <button
                 className="border border-gray-300 rounded-full px-4 py-2 hover:bg-gray-100 cursor-pointer"
                 onClick={async () => {
                   await rerunWorkflowExecution(
@@ -142,8 +146,7 @@ export const WorkflowExecutionDetail = () => {
                 }}
               >
                 🔄
-              </button>
-              {execution?.log && <LogInspector log={execution?.log} />}
+              </button> */}
             </div>
 
             {/* Progress indicator for in-progress workflows */}
@@ -172,22 +175,22 @@ export const WorkflowExecutionDetail = () => {
   );
 };
 
-const LogInspector = ({ log }: { log: string }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <>
-      <button onClick={() => setIsOpen(true)}>📓</button>
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
-        <div
-          style={{ scrollbarWidth: "none" }}
-          className="p-4 max-h-[80vh] overflow-x-hidden overflow-y-auto"
-        >
-          <h2 className="text-lg font-bold text-gray-900 mb-2">
-            Log del Workflow
-          </h2>
-          <Markdowner markdown={log} />
-        </div>
-      </Modal>
-    </>
-  );
-};
+// const LogInspector = ({ log }: { log: string }) => {
+//   const [isOpen, setIsOpen] = useState(false);
+//   return (
+//     <>
+//       <button onClick={() => setIsOpen(true)}>📓</button>
+//       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+//         <div
+//           style={{ scrollbarWidth: "none" }}
+//           className="p-4 max-h-[80vh] overflow-x-hidden overflow-y-auto"
+//         >
+//           <h2 className="text-lg font-bold text-gray-900 mb-2">
+//             Log del Workflow
+//           </h2>
+//           <Markdowner markdown={log} />
+//         </div>
+//       </Modal>
+//     </>
+//   );
+// };

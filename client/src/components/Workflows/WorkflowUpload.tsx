@@ -87,8 +87,8 @@ export const WorkflowUpload = ({
       return;
     }
 
-    if (files.length === 0 && audioRecordings.length === 0) {
-      toast.error("Debes seleccionar al menos un archivo o grabar audio");
+    if (files.length === 0 && audioRecordings.length === 0 && !inputTextRef.current?.value) {
+      toast.error("Debes seleccionar al menos un archivo, grabar audio o escribir un texto complementario");
       return;
     }
 
@@ -165,7 +165,6 @@ export const WorkflowUpload = ({
             multiple={true}
             name="files"
             onChange={handleFileChange}
-            required
           />
         </div>
 
@@ -276,9 +275,7 @@ export const WorkflowUpload = ({
           </button>
           <button
             type="submit"
-            disabled={
-              isLoading || (files.length === 0 && audioRecordings.length === 0)
-            }
+            disabled={isLoading}
             className="py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
           >
             {isLoading ? "Enviando archivos..." : "Iniciar Workflow"}

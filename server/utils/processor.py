@@ -1,8 +1,10 @@
 from datetime import datetime
 from typing import List, Optional
+import uuid
+import traceback
 
 from server.utils.printer import Printer
-from server.utils.pdf_reader import DocumentReader
+from server.utils.pdf_reader import DocumentReader, find_placeholders, generate_docx_from_template, docx_to_html
 from server.utils.image_reader import ImageReader
 from server.utils.audio_reader import AudioReader
 
@@ -42,6 +44,27 @@ def send_message_to_user(message: str, workflow_execution_id: str):
         ),
     )
 
+
+def create_workflow_example_text(workflow_example: WorkflowOutputExample):
+    if workflow_example.is_template:
+        return f"""
+<TEMPLATE id={workflow_example.id} help_text="This is an template provided by the user to this workflow, use the use_template tool to fill the template with the information provided by the user">
+<VARIABLES>
+    {json.dumps(workflow_example.variables)}
+</VARIABLES>
+<CONTENT>
+    {workflow_example.content}
+</CONTENT>
+</TEMPLATE>
+        """
+    else:
+        return f"""
+<EXAMPLE>
+<CONTENT>
+    {workflow_example.content}
+</CONTENT>
+</EXAMPLE>
+        """
 
 def process_workflow_execution(workflow_execution_id: str):
     printer.info(f"Procesando ejecución de workflow {workflow_execution_id}")
@@ -88,7 +111,7 @@ def process_workflow_execution(workflow_execution_id: str):
                 elif ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
                     extracted_text = image_reader.read(
                         file_path,
-                        f"Nombre del archivo adjunto: {asset.name}. Se está realizando un flujo de trabajo que requiere de la información de la imagen. Las instrucciones del flujo de trabajo son: {w.workflow.instructions}. Extraer la información que pueda ser útil para el flujo de trabajo. Si está disponible, esta descripción puede ser útil: {asset.brief}",
+                        f"Nombre del archivo adjunto: {asset.name}. Se está realizando un flujo de trabajo que requiere de la información de la imagen. Esta es una descripción del flujo de trabajo para que puedas entender mejor el tipo de información que se requiere extraer de la imagen: {w.workflow.description}. Extrae la información que pueda ser útil para el flujo de trabajo en la imagen. {'\nEsta descripción puede ser útil: ' + asset.brief if asset.brief else ''}",
                     )
                     log += f"Contenido de la imagen {asset.name} extraído con exito.\n"
                 elif ext in [".txt", ".xml", ".html", ".md", ".json", ".csv"]:
@@ -159,7 +182,7 @@ def process_workflow_execution(workflow_execution_id: str):
 
         output_examples_text = "\n".join(
             [
-                f"<EXAMPLE name={example.name} description={example.description}>{example.content}</EXAMPLE>"
+                create_workflow_example_text(example)
                 for example in w.workflow.output_examples
             ]
         )
@@ -167,15 +190,38 @@ def process_workflow_execution(workflow_execution_id: str):
         messages = [
             {
                 "role": "system",
-                "content": f"You are a helpful agent that can execute workflows over files. For the current workflow, these are the instructions provided by the user: ```{w.workflow.instructions}```. The goal is to use the available tools until the workflow is completed. Interact with the user to let him know the progress of the workflow. Stop calling tools ONLY when the workflow is completed, if you don't call tools, your loop will stop and you can maybe not finish the workflow. You will receive the text of the uploaded files, and you will have to use the tools to craft new files based on the requirements. The new files will be in markdown format. Don't stop until all necessary assets are created. Keep in mind that you cannot interact with the user directly, you can only use the tools to interact with the user. You need to work only with the information available at the moment. The user will see the result later. If the user added examples to this workflow, these are the examples: {output_examples_text}",
+                "content": f"""
+                
+ROLE: You are a helpful agent that can use different tools to execute workflows. 
+
+TASK DESCRIPTION:                
+- The goal is to use the available tools until the workflow is completed and you have generated all the required files. 
+- Interact with the user to let him know the progress of the workflow. 
+- Stop calling tools ONLY when the workflow is completed, if you don't call tools, your loop will stop and you can maybe not finish the workflow. You will receive the text of the uploaded files, and you will have to use the tools to craft new files based on the requirements. The new files will be in markdown format unless you're working with templates. Don't stop until all necessary assets are created. Keep in mind that you cannot interact with the user directly, you can only use the tools to interact with the user. You need to work only with the information available at the moment. The user will see the result later. 
+
+CURRENT WORKFLOW: 
+NAME: {w.workflow.name}
+```instructions
+{w.workflow.instructions}
+```
+
+EXAMPLES or TEMPLATES (if provided):
+
+{output_examples_text}
+
+""",
             },
             {
                 "role": "user",
-                "content": f"The workflow is: {w.workflow.name}. The assets on this execution are: {assets_text}",
+                "content": f"Use the following information to execute the workflow and craft the new files: {assets_text}",
             },
         ]
 
         def emit_message(message):
+            """
+            This function is used to emit a message to the user.
+            The message will be sent to the user and will be added to the generation log.
+            """
             send_message_to_user(message, str(workflow_execution_id))
             m = Message(
                 workflow_execution_id=workflow_execution_id,
@@ -187,6 +233,54 @@ def process_workflow_execution(workflow_execution_id: str):
             session.commit()
             return "Message sent successfully"
 
+        def use_template(template_id: str, variables: str, document_name: str):
+            """
+            This function use a template to generate a new file.
+            The template to use will be provided in the template_id parameter.
+            The variables parameter must be a json string with the variables to use like this: {"variable_name": "variable_value", "variable_name2": "variable_value2", ...}
+            The document_name parameter is the name of the document to create. It must not contain spaces or special characters.
+            """
+            printer.green(f"Using template {template_id} with variables {variables}")
+            template = next(
+                (t for t in w.workflow.output_examples if str(t.id) == template_id), None
+            )
+
+            
+
+            if not template:
+                return "The template was not found, please check the template id"
+            try:    
+                variables_dict = json.loads(variables)
+                random_id = str(uuid.uuid4())
+                output_path = os.path.join("uploads", str(workflow_execution_id), f"{random_id}.docx")
+                absolute_output_path = os.path.join(os.getcwd(), output_path)
+                printer.green(f"Generating docx file at {absolute_output_path}")
+                generate_docx_from_template(template.internal_path, variables_dict, output_path)
+                printer.green(f"Generated docx file at {absolute_output_path}")
+                html_content = docx_to_html(absolute_output_path)
+                # If the document name doesn't have a .docx extension, add it
+                if not document_name.endswith(".docx"):
+                    document_name += ".docx"
+
+
+                
+                asset = Asset(
+                    name=document_name,
+                    content=html_content,
+                    asset_type=AssetType.FILE,
+                    format="docx",
+                    workflow_execution_id=workflow_execution_id,
+                    origin=AssetOrigin.AI,
+                    internal_path=output_path,
+                )
+                session.add(asset)
+                session.commit()
+                return "The template was used successfully and the file was created successfuly"
+            except Exception as e:
+                traceback.print_exc()
+                printer.error(f"Error using template {template_id}: {e}")
+                return f"Error using template {template_id}: {e}. The file was not created."
+        
         def annotate_in_scratchpad(message: str):
             """
             This function is used to annotate the scratchpad.
@@ -196,13 +290,18 @@ def process_workflow_execution(workflow_execution_id: str):
             session.commit()
             return "Scratchpad annotated successfully"
 
-        def create_new_asset(name: str, content: str):
+        def create_new_markdown_asset(name: str, content: str):
+            """
+            This function is used to create a new markdown asset, use it only when there is not a template to use.
+            The name and content needs to match the criteria of the workflow.
+            """
             printer.magenta(content, "CONTENT", name, "NAME")
 
             asset = Asset(
                 name=name,
                 content=content,
                 extracted_text=content,
+                format="markdown",
                 asset_type=AssetType.TEXT,
                 workflow_execution_id=workflow_execution_id,
                 origin=AssetOrigin.AI,
@@ -231,12 +330,15 @@ def process_workflow_execution(workflow_execution_id: str):
             model=os.getenv("MODEL", "gemma3"),
             tools=[
                 # function_to_openai_schema(emit_message),
-                function_to_openai_schema(create_new_asset),
+                function_to_openai_schema(create_new_markdown_asset),
+                function_to_openai_schema(annotate_in_scratchpad),
+                function_to_openai_schema(use_template),
                 function_to_openai_schema(annotate_in_scratchpad),
             ],
             tools_fn_map={
                 "emit_message": emit_message,
-                "create_new_asset": create_new_asset,
+                "create_new_markdown_asset": create_new_markdown_asset,
+                "use_template": use_template,
                 "annotate_in_scratchpad": annotate_in_scratchpad,
             },
             on_message=on_message,
@@ -462,3 +564,35 @@ def process_example_files(
         session.commit()
 
     return "Output examples created successfully"
+
+
+def process_template_file(workflow_id: str, file_path: str):
+    with session_context_sync() as session:
+        w = session.query(Workflow).filter(Workflow.id == workflow_id).first()
+        if not w:
+            printer.error(f"No se encontró el workflow {workflow_id}")
+            return
+        file_extension = os.path.splitext(file_path)[1]
+        ext = file_extension.lower()
+
+        if ext in [".docx"]:
+            document_reader = DocumentReader()
+            extracted_text = document_reader.read(file_path)
+            placeholders = find_placeholders(extracted_text)
+            variables_dict = {var: "" for var in placeholders}
+            session.add(
+                WorkflowOutputExample(
+                    workflow_id=workflow_id,
+                    name=os.path.basename(file_path),
+                    content=extracted_text,
+                    description="Template document with placeholders",
+                    is_template=True,
+                    format="docx",
+                    internal_path=file_path,
+                    variables=variables_dict,
+                )
+            )
+        else:
+            printer.error(f"The file with extension {ext} is not supported")
+
+    return "Template file processed successfully"

@@ -8,21 +8,21 @@ import pytesseract
 from dotenv import load_dotenv
 
 
-tesseract_cmd = os.getenv("TESSERACT_CMD")
-if tesseract_cmd:
-    print("🔍 Usando tesseract_cmd:", tesseract_cmd)
+# tesseract_cmd = os.getenv("TESSERACT_CMD")
+# if tesseract_cmd:
+#     print("🔍 Usando tesseract_cmd:", tesseract_cmd)
 
-    # Si es Windows, aseguramos que termina en tesseract.exe
-    if os.name == "nt":
-        if os.path.isdir(tesseract_cmd):
-            tesseract_cmd = os.path.join(tesseract_cmd, "tesseract.exe")
+#     # Si es Windows, aseguramos que termina en tesseract.exe
+#     if os.name == "nt":
+#         if os.path.isdir(tesseract_cmd):
+#             tesseract_cmd = os.path.join(tesseract_cmd, "tesseract.exe")
         
-        if not os.path.isfile(tesseract_cmd):
-            raise FileNotFoundError(
-                f"El ejecutable de tesseract no se encontró en: {tesseract_cmd}"
-            )
+#         if not os.path.isfile(tesseract_cmd):
+#             raise FileNotFoundError(
+#                 f"El ejecutable de tesseract no se encontró en: {tesseract_cmd}"
+#             )
 
-    pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+#     pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 # IMPORTA TU INTERFAZ DE IA
 from server.ai.ai_interface import AIInterface
 

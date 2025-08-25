@@ -71,9 +71,8 @@ class OllamaProvider:
         tools: list[dict] | list[callable] = [],
     ):
         # self.check_model(model)
-        printer.blue(f"Generating completion using: {model}")
         context_window_size = int(os.getenv("CONTEXT_WINDOW_SIZE", 20000))
-        printer.blue(f"Context window size: {context_window_size}")
+
         response = self.client.chat(
             model=model,
             messages=messages,
@@ -132,14 +131,14 @@ class OpenAIProvider:
         turns = 0
 
         while True:
-            printer.yellow(self.messages, "MESSAGES")
+            # printer.yellow(self.messages, "MESSAGES")
             response = self.chat(
                 messages=self.messages,
                 model=model,
                 stream=False,
                 tools=tools,
             )
-            printer.yellow(response.choices[0].message, "RESPONSE")
+            # printer.yellow(response.choices[0].message, "RESPONSE")
 
             # OpenAI: response.choices[0].message
             if hasattr(response, "choices"):

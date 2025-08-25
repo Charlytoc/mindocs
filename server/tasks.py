@@ -15,6 +15,7 @@ from server.utils.processor import (
     process_workflow_execution,
     request_changes,
     process_example_files,
+    process_template_file,
 )
 
 printer = Printer("TASKS")
@@ -96,4 +97,21 @@ def async_process_example_files(
         )
     except Exception as e:
         printer.error(f"Error al procesar archivos de ejemplo: {e}")
+        raise e
+
+
+@celery.task(
+    name="process_template_file",
+    autoretry_for=(Exception,),
+    retry_kwargs={"countdown": 10},
+    retry_backoff=True,
+    bind=True,
+    max_retries=5,
+)
+def async_process_template_file(self, workflow_id: str, file_path: str):
+    try:
+        printer.info(f"Procesando plantilla para el workflow {workflow_id}")
+        return process_template_file(workflow_id, file_path)
+    except Exception as e:
+        printer.error(f"Error al procesar plantilla: {e}")
         raise e
