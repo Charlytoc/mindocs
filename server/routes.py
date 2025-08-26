@@ -244,6 +244,7 @@ async def create_workflow(
         
         # Save template file
         template_path = os.path.join(UPLOADS_PATH, str(workflow.id), "template.docx")
+        os.makedirs(os.path.dirname(template_path), exist_ok=True)
         with open(template_path, "wb") as buffer:
             shutil.copyfileobj(template_docx.file, buffer)
         
