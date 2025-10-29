@@ -11,9 +11,10 @@ from server.tasks import (
     async_request_changes,
     async_process_example_files,
     async_process_template_file,
+    async_process_workflow_execution_v2,
 )
 
-from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException, Header
+from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException, Header, Request
 from fastapi.responses import JSONResponse, FileResponse
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,9 +33,15 @@ from server.models import (
     AssetOrigin,
     AssetType,
     AssetStatus,
+    SubscriptionPlan,
+    UserSubscription,
+    SubscriptionStatus,
+    CreditTransactionType,
 )
 from server.utils.printer import Printer
 from server.utils.csv_logger import CSVLogger
+from server.services.credit_service import CreditService
+from server.services.stripe_service import StripeService
 
 # from server.utils.pdf_reader import DocumentReader
 
@@ -445,8 +452,16 @@ async def start_workflow(
     await session.commit()
 
     printer.yellow("Execution created, orchestrating tasks...")
-    async_process_workflow_execution.delay(execution.id)
-    printer.yellow(f"Background task started for execution id: {execution.id}")
+    
+    # Feature flag to use V2 processor
+    use_v2 = os.getenv("USE_RESPONSES_API", "false").lower() == "true"
+    
+    if use_v2:
+        async_process_workflow_execution_v2.delay(execution.id)
+        printer.yellow(f"Background task V2 started for execution id: {execution.id}")
+    else:
+        async_process_workflow_execution.delay(execution.id)
+        printer.yellow(f"Background task V1 started for execution id: {execution.id}")
     return JSONResponse(
         {
             "workflow_execution_id": str(execution.id),
@@ -473,7 +488,15 @@ async def rerun_workflow_execution(
         raise HTTPException(status_code=403, detail="Not allowed")
     execution.status = WorkflowExecutionStatus.PENDING
     await session.commit()
-    async_process_workflow_execution.delay(execution.id)
+    
+    # Feature flag to use V2 processor
+    use_v2 = os.getenv("USE_RESPONSES_API", "false").lower() == "true"
+    
+    if use_v2:
+        async_process_workflow_execution_v2.delay(execution.id)
+    else:
+        async_process_workflow_execution.delay(execution.id)
+    
     return JSONResponse(
         {
             "message": "Execution rerunned",
@@ -915,3 +938,344 @@ async def request_changes_route(
     workflow_execution_id = asset.workflow_execution.id
     async_request_changes.delay(workflow_execution_id, asset_id, changes, not_id)
     return {"message": "Changes requested"}
+
+
+# --- CREDITS ENDPOINTS ------------------------------------------------
+
+
+@router.get("/user/credits")
+async def get_user_credits(
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...)
+):
+    """Get user's current credit balance"""
+    result = await session.execute(select(User).where(User.email == x_user_email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    
+    balance = await CreditService.get_user_balance(session, str(user.id))
+    
+    return {
+        "balance": balance.balance,
+        "formatted_balance": f"${balance.balance / 100:.2f}",
+        "last_credited_at": balance.last_credited_at.isoformat() if balance.last_credited_at else None,
+        "last_debited_at": balance.last_debited_at.isoformat() if balance.last_debited_at else None,
+    }
+
+
+@router.get("/user/credit-history")
+async def get_credit_history(
+    limit: int = 50,
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...)
+):
+    """Get user's credit transaction history"""
+    result = await session.execute(select(User).where(User.email == x_user_email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    
+    transactions = await CreditService.get_transaction_history(session, str(user.id), limit)
+    
+    return [
+        {
+            "id": str(t.id),
+            "type": t.transaction_type.value,
+            "credits": t.credits,
+            "description": t.description,
+            "balance_after": t.balance_after,
+            "created_at": t.created_at.isoformat(),
+            "metadata": t.metadata
+        }
+        for t in transactions
+    ]
+
+
+# --- SUBSCRIPTION ENDPOINTS ------------------------------------------------
+
+
+@router.get("/subscription-plans")
+async def get_subscription_plans(
+    session: AsyncSession = Depends(get_session),
+):
+    """Get all available subscription plans (public endpoint)"""
+    result = await session.execute(
+        select(SubscriptionPlan).where(SubscriptionPlan.is_active == True)
+    )
+    plans = result.scalars().all()
+    
+    return [
+        {
+            "id": str(p.id),
+            "plan_type": p.plan_type.value,
+            "name": p.name,
+            "description": p.description,
+            "price_usd": float(p.price_usd),
+            "monthly_credits": p.monthly_credits,
+            "features": p.features,
+        }
+        for p in plans
+    ]
+
+
+@router.get("/user/subscription")
+async def get_user_subscription(
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...)
+):
+    """Get user's current subscription"""
+    result = await session.execute(select(User).where(User.email == x_user_email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    
+    result = await session.execute(
+        select(UserSubscription)
+        .options(selectinload(UserSubscription.plan))
+        .where(UserSubscription.user_id == user.id)
+    )
+    subscription = result.scalar_one_or_none()
+    
+    if not subscription:
+        return {
+            "has_subscription": False,
+            "subscription": None
+        }
+    
+    return {
+        "has_subscription": True,
+        "subscription": {
+            "id": str(subscription.id),
+            "plan": {
+                "id": str(subscription.plan.id),
+                "name": subscription.plan.name,
+                "plan_type": subscription.plan.plan_type.value,
+                "price_usd": float(subscription.plan.price_usd),
+                "monthly_credits": subscription.plan.monthly_credits,
+            },
+            "status": subscription.status.value,
+            "current_period_start": subscription.current_period_start.isoformat(),
+            "current_period_end": subscription.current_period_end.isoformat(),
+        }
+    }
+
+
+@router.post("/subscription/create-checkout")
+async def create_checkout_session(
+    plan_id: str = Form(...),
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...)
+):
+    """Create Stripe checkout session for a subscription"""
+    result = await session.execute(select(User).where(User.email == x_user_email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    
+    # Get plan
+    result = await session.execute(
+        select(SubscriptionPlan).where(SubscriptionPlan.id == plan_id)
+    )
+    plan = result.scalar_one_or_none()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    if not plan.is_active:
+        raise HTTPException(status_code=400, detail="Plan is not active")
+    
+    # Create checkout session
+    try:
+        checkout_url = StripeService.create_checkout_session(
+            user_id=str(user.id),
+            plan_id=plan_id,
+            plan_price_usd=float(plan.price_usd)
+        )
+        
+        return {"checkout_url": checkout_url}
+        
+    except Exception as e:
+        printer.error(f"Error creating checkout session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+
+@router.post("/subscription/cancel")
+async def cancel_subscription(
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...)
+):
+    """Cancel user's subscription"""
+    result = await session.execute(select(User).where(User.email == x_user_email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    
+    result = await session.execute(
+        select(UserSubscription).where(UserSubscription.user_id == user.id)
+    )
+    subscription = result.scalar_one_or_none()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    if subscription.status != SubscriptionStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Subscription is not active")
+    
+    # Cancel in Stripe
+    if subscription.stripe_subscription_id:
+        try:
+            StripeService.cancel_subscription(subscription.stripe_subscription_id)
+        except Exception as e:
+            printer.error(f"Error canceling in Stripe: {e}")
+            raise HTTPException(status_code=500, detail="Failed to cancel subscription in Stripe")
+    
+    # Update status
+    subscription.status = SubscriptionStatus.CANCELLED
+    await session.commit()
+    
+    return {"message": "Subscription cancelled"}
+
+
+@router.post("/webhooks/stripe")
+async def stripe_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    """Handle Stripe webhook events"""
+    payload = await request.body()
+    signature = request.headers.get("stripe-signature")
+    
+    if not signature:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+    
+    try:
+        event = StripeService.handle_webhook(payload, signature)
+        
+        # Handle different event types
+        if event["type"] == "checkout.session.completed":
+            session_data = event["data"]["object"]
+            user_id = session_data["client_reference_id"]
+            plan_id = session_data["metadata"].get("plan_id")
+            
+            # Get user and plan
+            result = await session.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                printer.error(f"User {user_id} not found for webhook")
+                return {"status": "error"}
+            
+            result = await session.execute(
+                select(SubscriptionPlan).where(SubscriptionPlan.id == plan_id)
+            )
+            plan = result.scalar_one_or_none()
+            
+            if not plan:
+                printer.error(f"Plan {plan_id} not found for webhook")
+                return {"status": "error"}
+            
+            # Create or update subscription
+            from datetime import datetime, timedelta
+            
+            result = await session.execute(
+                select(UserSubscription).where(UserSubscription.user_id == user_id)
+            )
+            subscription = result.scalar_one_or_none()
+            
+            now = datetime.now()
+            if subscription:
+                subscription.plan_id = plan.id
+                subscription.current_period_start = now
+                subscription.current_period_end = now + timedelta(days=30)
+                subscription.status = SubscriptionStatus.ACTIVE
+            else:
+                subscription = UserSubscription(
+                    user_id=user_id,
+                    plan_id=plan.id,
+                    stripe_subscription_id=session_data.get("subscription"),
+                    stripe_customer_id=session_data.get("customer"),
+                    current_period_start=now,
+                    current_period_end=now + timedelta(days=30),
+                    status=SubscriptionStatus.ACTIVE
+                )
+                session.add(subscription)
+            
+            await session.commit()
+            
+            # Add credits to user
+            await CreditService.add_credits(
+                session,
+                str(user_id),
+                plan.monthly_credits,
+                CreditTransactionType.SUBSCRIPTION_RENEWAL,
+                description=f"Monthly credits for {plan.name}",
+                subscription_id=str(subscription.id)
+            )
+            
+            printer.green(f"Added {plan.monthly_credits} credits to user {user_id}")
+        
+        elif event["type"] == "customer.subscription.deleted":
+            subscription_id = event["data"]["object"]["id"]
+            
+            # Find subscription
+            result = await session.execute(
+                select(UserSubscription).where(
+                    UserSubscription.stripe_subscription_id == subscription_id
+                )
+            )
+            subscription = result.scalar_one_or_none()
+            
+            if subscription:
+                subscription.status = SubscriptionStatus.CANCELLED
+                await session.commit()
+                printer.green(f"Subscription {subscription_id} cancelled")
+        
+        return {"status": "success"}
+        
+    except ValueError as e:
+        printer.error(f"Webhook error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        printer.error(f"Unexpected webhook error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/subscription/manage")
+async def manage_subscription(
+    session: AsyncSession = Depends(get_session),
+    x_user_email: str = Header(...)
+):
+    """Create customer portal session for subscription management"""
+    result = await session.execute(select(User).where(User.email == x_user_email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    
+    result = await session.execute(
+        select(UserSubscription).where(UserSubscription.user_id == user.id)
+    )
+    subscription = result.scalar_one_or_none()
+    
+    if not subscription:
+        raise HTTPException(status_code=404, detail="No subscription found")
+    
+    if not subscription.stripe_customer_id:
+        raise HTTPException(status_code=400, detail="No Stripe customer ID")
+    
+    try:
+        portal_url = StripeService.create_customer_portal_session(
+            subscription.stripe_customer_id
+        )
+        
+        return {"portal_url": portal_url}
+        
+    except Exception as e:
+        printer.error(f"Error creating portal session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create portal session")

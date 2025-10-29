@@ -9,6 +9,8 @@ from sqlalchemy import (
     Text,
     JSON,
     func,
+    Integer,
+    Numeric,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -32,6 +34,15 @@ class User(Base):
 
     workflows = relationship(
         "Workflow", back_populates="user", cascade="all, delete-orphan"
+    )
+    subscription = relationship(
+        "UserSubscription", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    credit_balance = relationship(
+        "CreditBalance", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+    credit_transactions = relationship(
+        "CreditTransaction", back_populates="user", cascade="all, delete-orphan"
     )
 
 
@@ -191,3 +202,132 @@ class WorkflowOutputExample(Base):
     description = Column(Text, nullable=True)
 
     workflow = relationship("Workflow", back_populates="output_examples")
+
+
+class SubscriptionPlanType(str, enum.Enum):
+    FREE = "FREE"
+    BASIC = "BASIC"
+    PRO = "PRO"
+    ENTERPRISE = "ENTERPRISE"
+
+
+class SubscriptionStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    CANCELLED = "CANCELLED"
+    PAST_DUE = "PAST_DUE"
+    TRIALING = "TRIALING"
+
+
+class CreditTransactionType(str, enum.Enum):
+    SUBSCRIPTION_RENEWAL = "SUBSCRIPTION_RENEWAL"
+    PURCHASE_PACKAGE = "PURCHASE_PACKAGE"
+    ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT"
+    REFUND = "REFUND"
+    WORKFLOW_EXECUTION = "WORKFLOW_EXECUTION"
+    FAILED_OPERATION = "FAILED_OPERATION"
+
+
+class SubscriptionPlan(Base):
+    __tablename__ = "subscription_plans"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Tipo y nombre
+    plan_type = Column(Enum(SubscriptionPlanType), unique=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Precio y valor
+    price_usd = Column(Numeric(10, 2), nullable=False)
+    monthly_credits = Column(Integer, nullable=False)
+    stripe_price_id = Column(String(255), nullable=True)
+
+    # Costos internos (para calcular margen)
+    estimated_cost_usd = Column(Numeric(10, 2), nullable=False)
+    margin_percentage = Column(Numeric(5, 2), nullable=False)
+
+    # Metadata
+    is_active = Column(Boolean, default=True)
+    features = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user_subscriptions = relationship("UserSubscription", back_populates="plan")
+
+
+class UserSubscription(Base):
+    __tablename__ = "user_subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
+    plan_id = Column(UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=False)
+
+    # Stripe
+    stripe_subscription_id = Column(String(255), unique=True, nullable=True)
+    stripe_customer_id = Column(String(255), nullable=True)
+    stripe_price_id = Column(String(255), nullable=True)
+
+    # Estado
+    status = Column(Enum(SubscriptionStatus), nullable=False, default=SubscriptionStatus.ACTIVE)
+
+    # Períodos
+    current_period_start = Column(DateTime(timezone=True), nullable=False)
+    current_period_end = Column(DateTime(timezone=True), nullable=False)
+
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="subscription")
+    plan = relationship("SubscriptionPlan", back_populates="user_subscriptions")
+    credit_transactions = relationship("CreditTransaction", back_populates="subscription")
+
+
+class CreditBalance(Base):
+    __tablename__ = "credit_balances"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False)
+
+    # Balance actual
+    balance = Column(Integer, default=0, nullable=False)  # En créditos (1 crédito = $0.01)
+
+    # Tracking
+    last_credited_at = Column(DateTime(timezone=True), nullable=True)
+    last_debited_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationship
+    user = relationship("User", back_populates="credit_balance")
+
+
+class CreditTransaction(Base):
+    __tablename__ = "credit_transactions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+
+    # Tipo y cantidad
+    transaction_type = Column(Enum(CreditTransactionType), nullable=False)
+    credits = Column(Integer, nullable=False)  # Positivo = suma, Negativo = resta
+
+    # Referencias
+    execution_id = Column(UUID(as_uuid=True), ForeignKey("workflow_executions.id"), nullable=True)
+    subscription_id = Column(UUID(as_uuid=True), ForeignKey("user_subscriptions.id"), nullable=True)
+
+    # Detalles
+    description = Column(Text, nullable=True)
+    metadata = Column(JSON, nullable=True)
+
+    # Balance antes y después
+    balance_before = Column(Integer, nullable=True)
+    balance_after = Column(Integer, nullable=True)
+
+    # Timestamp
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="credit_transactions")
+    execution = relationship("WorkflowExecution", nullable=True)
+    subscription = relationship("UserSubscription", back_populates="credit_transactions")

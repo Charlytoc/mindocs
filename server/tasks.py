@@ -18,6 +18,10 @@ from server.utils.processor import (
     process_template_file,
 )
 
+from server.utils.processor_v2 import (
+    process_workflow_execution_v2,
+)
+
 printer = Printer("TASKS")
 
 
@@ -114,4 +118,38 @@ def async_process_template_file(self, workflow_id: str, file_path: str):
         return process_template_file(workflow_id, file_path)
     except Exception as e:
         printer.error(f"Error al procesar plantilla: {e}")
+        raise e
+
+
+@celery.task(
+    name="process_workflow_execution_v2",
+    autoretry_for=(Exception,),
+    retry_kwargs={"countdown": 10},
+    retry_backoff=True,
+    bind=True,
+    max_retries=5,
+)
+def async_process_workflow_execution_v2(self, workflow_execution_id: str):
+    try:
+        printer.info(f"Procesando ejecución de workflow V2 {workflow_execution_id}")
+        redis_client.publish(
+            "workflow_updates",
+            json.dumps(
+                {
+                    "workflow_execution_id": str(
+                        workflow_execution_id
+                    ),  # <-- fuerza a str
+                    "log": "¡Proceso V2 iniciado! Procesando archivos.",
+                    "status": "PROCESSING",
+                    "assets_ready": False,
+                }
+            ),
+        )
+        printer.green(
+            f"Message sent to socketio to room: workflow_{workflow_execution_id}"
+        )
+
+        return process_workflow_execution_v2(str(workflow_execution_id))
+    except Exception as e:
+        printer.error(f"Error al procesar workflow V2: {e}")
         raise e
