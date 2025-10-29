@@ -318,7 +318,7 @@ class CreditTransaction(Base):
 
     # Detalles
     description = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    transaction_metadata = Column(JSON, nullable=True)
 
     # Balance antes y después
     balance_before = Column(Integer, nullable=True)
@@ -329,5 +329,5 @@ class CreditTransaction(Base):
 
     # Relationships
     user = relationship("User", back_populates="credit_transactions")
-    execution = relationship("WorkflowExecution", nullable=True)
+    execution = relationship("WorkflowExecution")
     subscription = relationship("UserSubscription", back_populates="credit_transactions")

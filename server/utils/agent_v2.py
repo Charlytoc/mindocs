@@ -2,15 +2,14 @@ from typing import List, Dict, Any, Callable, Optional
 from pydantic import BaseModel, Field
 from openai.types.responses.response_input_item import Message
 from openai.types.responses.response_output_message import ResponseOutputMessage
-from openai.types.responses.response_output_item import ResponseOutputItem
-from openai.types.responses.response_output_function_call import ResponseOutputFunctionCall
-from openai.types.responses.response_output_function_call_output import ResponseOutputFunctionCallOutput
+from openai.types.responses import ResponseFunctionToolCall, ResponseFunctionCallOutputItem, ResponseFunctionToolCall
+
+
 from openai.types.responses.response_input_text import ResponseInputText
-from openai.types.responses.response_output_text import ResponseOutputText
 import json
 import logging
 
-from server.services.openai_responses_service import ResponsesAPIService
+from server.services.openai_responses_service import ResponsesAPIService    
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +132,7 @@ class WorkflowAgent:
                     
                     # Handle function call outputs
                     elif self.openai_service.is_function_call_output(output):
-                        if isinstance(output, ResponseOutputFunctionCall):
+                        if isinstance(output, ResponseFunctionToolCall):
                             function_calls.append(output)
                 
                 # Execute function calls if any
@@ -157,7 +156,7 @@ class WorkflowAgent:
                                 logger.error(f"Function {tool_name} not found in tools_fn_map")
                             
                             # Add function result to messages
-                            function_output = ResponseOutputFunctionCallOutput(
+                            function_output = ResponseFunctionToolCall(
                                 call_id=call_id,
                                 output=str(result),
                                 type="function_call_output"
@@ -168,7 +167,7 @@ class WorkflowAgent:
                             error_msg = f"Error executing function {tool_name}: {str(e)}"
                             logger.error(error_msg, exc_info=True)
                             
-                            function_output = ResponseOutputFunctionCallOutput(
+                            function_output = ResponseFunctionToolCall(
                                 call_id=call_id,
                                 output=error_msg,
                                 type="function_call_output"

@@ -1,12 +1,11 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from openai import OpenAI
 from openai.types.responses import Response
 from openai.types.responses.response_output_item import ResponseOutputItem
 from openai.types.responses.response_input_item import Message
 from openai.types.responses.response_output_message import ResponseOutputMessage
-from openai.types.responses.response_output_function_call import ResponseOutputFunctionCall
-from openai.types.responses.response_output_text import ResponseOutputText
-
+from openai.types.responses.response_function_call_output_item import ResponseFunctionCallOutputItem
+from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 
 class ResponsesAPIService:
     """Service for interacting with OpenAI's Responses API"""
@@ -58,9 +57,9 @@ class ResponsesAPIService:
                     return item.text
         return None
     
-    def extract_function_calls(self, output: ResponseOutputItem) -> List[ResponseOutputFunctionCall]:
+    def extract_function_calls(self, output: ResponseOutputItem) -> List[ResponseFunctionCallOutputItem]:
         """Extract function calls from a response output item"""
-        if isinstance(output, ResponseOutputFunctionCall):
+        if isinstance(output, ResponseFunctionCallOutputItem):
             return [output]
         return []
     
@@ -70,4 +69,4 @@ class ResponsesAPIService:
     
     def is_function_call_output(self, output: ResponseOutputItem) -> bool:
         """Check if output is a function call output"""
-        return isinstance(output, ResponseOutputFunctionCall)
+        return isinstance(output, ResponseFunctionToolCall)
